@@ -35,25 +35,12 @@ func (h *Handler) Report(c *fiber.Ctx) error {
 	}
 
 	var body struct {
-		ReportedID  string `json:"reported_id"`
-		Category    string `json:"category"`
-		Description string `json:"description"`
+		ReportedID  string `json:"reported_id" validate:"required"`
+		Category    string `json:"category" validate:"required,oneof=harassment fake_profile scam inappropriate underage"`
+		Description string `json:"description" validate:"max=500"`
 	}
-	if err := c.BodyParser(&body); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-	}
-	if body.ReportedID == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "reported_id is required"})
-	}
-	if body.Category == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "category is required"})
-	}
-	validCategories := map[string]bool{
-		"harassment": true, "fake_profile": true, "scam": true,
-		"inappropriate": true, "underage": true,
-	}
-	if !validCategories[body.Category] {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid category"})
+	if err := middleware.BindAndValidate(c, &body); err != nil {
+		return err
 	}
 	if body.ReportedID == u.ID {
 		return c.Status(400).JSON(fiber.Map{"error": "cannot report yourself"})

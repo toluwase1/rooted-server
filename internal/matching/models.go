@@ -45,10 +45,10 @@ type ScoredCandidate struct {
 }
 
 type SwipeRequest struct {
-	CandidateID  string `json:"candidate_id" validate:"required"`
+	CandidateID  string `json:"candidate_id" validate:"required,uuid"`
 	Action       string `json:"action" validate:"required,oneof=like pass"`
 	Comment      string `json:"comment,omitempty" validate:"max=200"`
-	LikedElement string `json:"liked_element,omitempty"`
+	LikedElement string `json:"liked_element,omitempty" validate:"max=50"`
 }
 
 type CandidateFilters struct {

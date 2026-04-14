@@ -87,35 +87,8 @@ func (h *Handler) CreateProfile(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	var req CreateProfileRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body: " + err.Error()})
-	}
-	if req.FirstName == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "first_name is required"})
-	}
-	if req.DateOfBirth == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "date_of_birth is required"})
-	}
-	if req.Gender == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "gender is required"})
-	}
-	if req.GenderPref == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "gender_pref is required"})
-	}
-	if len(req.Heritage) == 0 {
-		return c.Status(400).JSON(fiber.Map{"error": "at least one heritage selection required"})
-	}
-	if req.DiasporaTag == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "diaspora_tag is required"})
-	}
-	if req.Intention == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "intention is required"})
-	}
-	if len(req.CulturalPrompts) < 2 {
-		return c.Status(400).JSON(fiber.Map{"error": "at least 2 cultural prompts required"})
-	}
-	if len(req.PersonalityPrompts) < 1 {
-		return c.Status(400).JSON(fiber.Map{"error": "at least 1 personality prompt required"})
+	if err := middleware.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
 	profile, err := h.service.CreateProfile(c.Context(), u.ID, req)
@@ -132,8 +105,8 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	var req UpdateProfileRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body: " + err.Error()})
+	if err := middleware.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 	if err := h.service.UpdateProfile(c.Context(), u.ID, req); err != nil {
 		log.Printf("ERROR UpdateProfile user=%s: %v", u.ID, err)

@@ -3,7 +3,6 @@ package matching
 import (
 	"log"
 	"strconv"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rooted-dating/rooted-server/internal/chat"
@@ -117,14 +116,8 @@ func (h *Handler) Swipe(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	var req SwipeRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-	}
-	if req.CandidateID == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "candidate_id is required"})
-	}
-	if req.Action != "like" && req.Action != "pass" {
-		return c.Status(400).JSON(fiber.Map{"error": "action must be 'like' or 'pass'"})
+	if err := middleware.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 	if req.CandidateID == u.ID {
 		return c.Status(400).JSON(fiber.Map{"error": "cannot swipe on yourself"})
@@ -264,10 +257,3 @@ func intQuery(c *fiber.Ctx, key string, defaultVal int) int {
 	return v
 }
 
-func splitQuery(c *fiber.Ctx, key string) []string {
-	v := c.Query(key, "")
-	if v == "" {
-		return nil
-	}
-	return strings.Split(v, ",")
-}
