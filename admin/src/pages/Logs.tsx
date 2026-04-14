@@ -9,6 +9,7 @@ export default function Logs() {
   const [severity, setSeverity] = useState('')
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'logs' | 'stats'>('stats')
+  const [selectedEntry, setSelectedEntry] = useState<any>(null)
 
   useEffect(() => {
     loadData()
@@ -154,52 +155,156 @@ export default function Logs() {
           )}
         </>
       ) : view === 'logs' ? (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {entries.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
-              No log entries found
-            </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Level</th>
-                  <th>Method</th>
-                  <th>Path</th>
-                  <th>Status</th>
-                  <th>Latency</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e: any) => (
-                  <tr key={e.id}>
-                    <td style={{ fontSize: '11px', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
-                      {new Date(e.timestamp).toLocaleTimeString()}
-                    </td>
-                    <td><span className={`badge ${severityBadge(e.severity)}`}>{e.severity}</span></td>
-                    <td><code style={{ fontSize: '11px' }}>{e.method}</code></td>
-                    <td style={{ fontSize: '12px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {e.path}
-                    </td>
-                    <td>
-                      {e.status_code > 0 && (
-                        <span style={{ color: statusColor(e.status_code), fontWeight: '600', fontSize: '12px' }}>
-                          {e.status_code}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      {e.duration_ms > 0 ? `${e.duration_ms}ms` : ''}
-                    </td>
-                    <td style={{ fontSize: '12px', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {e.error || e.message || ''}
-                    </td>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          {/* Log table */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden', flex: 1 }}>
+            {entries.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                No log entries found
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Level</th>
+                    <th>Method</th>
+                    <th>Path</th>
+                    <th>Status</th>
+                    <th>Latency</th>
+                    <th>Message</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {entries.map((e: any) => (
+                    <tr key={e.id} onClick={() => setSelectedEntry(e)}
+                      style={{
+                        cursor: 'pointer',
+                        background: selectedEntry?.id === e.id ? 'var(--border)' : undefined,
+                      }}>
+                      <td style={{ fontSize: '11px', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                        {new Date(e.timestamp).toLocaleTimeString()}
+                      </td>
+                      <td><span className={`badge ${severityBadge(e.severity)}`}>{e.severity}</span></td>
+                      <td><code style={{ fontSize: '11px' }}>{e.method}</code></td>
+                      <td style={{ fontSize: '12px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {e.path}
+                      </td>
+                      <td>
+                        {e.status_code > 0 && (
+                          <span style={{ color: statusColor(e.status_code), fontWeight: '600', fontSize: '12px' }}>
+                            {e.status_code}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                        {e.duration_ms > 0 ? `${e.duration_ms}ms` : ''}
+                      </td>
+                      <td style={{ fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {e.error || e.message || ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Detail panel */}
+          {selectedEntry && (
+            <div style={{ width: '360px', flexShrink: 0 }}>
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '16px' }}>Request Detail</h3>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setSelectedEntry(null)}>✕</button>
+                </div>
+
+                {/* Summary */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  <span className={`badge ${severityBadge(selectedEntry.severity)}`}>{selectedEntry.severity}</span>
+                  {selectedEntry.status_code > 0 && (
+                    <span style={{
+                      color: statusColor(selectedEntry.status_code),
+                      fontWeight: '600', fontSize: '13px',
+                    }}>
+                      HTTP {selectedEntry.status_code}
+                    </span>
+                  )}
+                  {selectedEntry.duration_ms > 0 && (
+                    <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
+                      {selectedEntry.duration_ms}ms
+                    </span>
+                  )}
+                </div>
+
+                {/* Request info */}
+                <div className="card-title">Request</div>
+                <div style={{ fontSize: '13px', marginBottom: '16px' }}>
+                  <div style={{ marginBottom: '4px' }}>
+                    <code style={{ fontSize: '12px', color: 'var(--primary)' }}>
+                      {selectedEntry.method} {selectedEntry.path}
+                    </code>
+                  </div>
+                  <div style={{ color: 'var(--text-dim)' }}>
+                    {new Date(selectedEntry.timestamp).toLocaleString()}
+                  </div>
+                  {selectedEntry.service && (
+                    <div style={{ color: 'var(--text-dim)', marginTop: '2px' }}>
+                      Service: {selectedEntry.service}
+                    </div>
+                  )}
+                  {selectedEntry.telegram_id > 0 && (
+                    <div style={{ color: 'var(--text-dim)', marginTop: '2px' }}>
+                      Telegram ID: {selectedEntry.telegram_id}
+                    </div>
+                  )}
+                </div>
+
+                {/* Error message */}
+                {selectedEntry.error && (
+                  <>
+                    <div className="card-title">Error</div>
+                    <div style={{
+                      fontSize: '13px', color: 'var(--red)',
+                      background: '#EF444410', padding: '10px',
+                      borderRadius: '8px', marginBottom: '16px',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    }}>
+                      {selectedEntry.error}
+                    </div>
+                  </>
+                )}
+
+                {/* Message */}
+                {selectedEntry.message && selectedEntry.message !== selectedEntry.error && (
+                  <>
+                    <div className="card-title">Message</div>
+                    <div style={{
+                      fontSize: '13px', marginBottom: '16px',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    }}>
+                      {selectedEntry.message}
+                    </div>
+                  </>
+                )}
+
+                {/* Raw payload */}
+                {selectedEntry.raw_payload && Object.keys(selectedEntry.raw_payload).length > 0 && (
+                  <>
+                    <div className="card-title">Raw Payload</div>
+                    <pre style={{
+                      fontSize: '11px', color: 'var(--text-dim)',
+                      background: 'var(--bg)', padding: '10px',
+                      borderRadius: '8px', overflow: 'auto',
+                      maxHeight: '300px', whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}>
+                      {JSON.stringify(selectedEntry.raw_payload, null, 2)}
+                    </pre>
+                  </>
+                )}
+              </div>
+            </div>
           )}
         </div>
       ) : null}
