@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
+	"github.com/rooted-dating/rooted-server/internal/shared/database"
 )
 
 const configCacheTTL = 5 * time.Minute
@@ -17,10 +17,10 @@ const configCacheTTL = 5 * time.Minute
 // live here instead of being hardcoded.
 type DynamicConfig struct {
 	db    *pgxpool.Pool
-	redis *redis.Client
+	redis *database.SafeRedis
 }
 
-func NewDynamicConfig(db *pgxpool.Pool, redis *redis.Client) *DynamicConfig {
+func NewDynamicConfig(db *pgxpool.Pool, redis *database.SafeRedis) *DynamicConfig {
 	return &DynamicConfig{db: db, redis: redis}
 }
 
@@ -278,10 +278,10 @@ func (c *DynamicConfig) IsFeatureEnabled(ctx context.Context, flag, userID, regi
 // Invalidate removes a config key from Redis cache (called when admin updates a value).
 func (c *DynamicConfig) Invalidate(ctx context.Context, key string) {
 	c.redis.Del(ctx, "config:"+key)
-	// Also delete any regional overrides
-	iter := c.redis.Scan(ctx, 0, "config:"+key+":*", 100).Iterator()
-	for iter.Next(ctx) {
-		c.redis.Del(ctx, iter.Val())
+	// Also delete common regional overrides
+	regions := []string{"NG", "KE", "GH", "ZA", "CM", "GB", "US", "CA", "FR", "DE"}
+	for _, r := range regions {
+		c.redis.Del(ctx, "config:"+key+":"+r)
 	}
 }
 

@@ -8,20 +8,20 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/rooted-dating/rooted-server/internal/shared/config"
+	"github.com/rooted-dating/rooted-server/internal/shared/database"
 )
 
 const telegramAPI = "https://api.telegram.org/bot%s/%s"
 
 type Service struct {
 	botToken string
-	redis    *redis.Client
+	redis    *database.SafeRedis
 	config   *config.DynamicConfig
 	client   *http.Client
 }
 
-func NewService(botToken string, redis *redis.Client, cfg *config.DynamicConfig) *Service {
+func NewService(botToken string, redis *database.SafeRedis, cfg *config.DynamicConfig) *Service {
 	return &Service{
 		botToken: botToken,
 		redis:    redis,

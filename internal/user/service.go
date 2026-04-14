@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/rooted-dating/rooted-server/internal/shared/database"
 )
 
 const profileCacheTTL = 1 * time.Hour
 
 type Service struct {
 	repo  Repository
-	redis *redis.Client
+	redis *database.SafeRedis
 }
 
-func NewService(repo Repository, redis *redis.Client) *Service {
+func NewService(repo Repository, redis *database.SafeRedis) *Service {
 	return &Service{repo: repo, redis: redis}
 }
 

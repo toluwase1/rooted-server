@@ -7,17 +7,17 @@ import (
 	"sort"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/rooted-dating/rooted-server/internal/shared/config"
+	"github.com/rooted-dating/rooted-server/internal/shared/database"
 )
 
 type Service struct {
 	repo   Repository
-	redis  *redis.Client
+	redis  *database.SafeRedis
 	config *config.DynamicConfig
 }
 
-func NewService(repo Repository, redis *redis.Client, cfg *config.DynamicConfig) *Service {
+func NewService(repo Repository, redis *database.SafeRedis, cfg *config.DynamicConfig) *Service {
 	return &Service{repo: repo, redis: redis, config: cfg}
 }
 

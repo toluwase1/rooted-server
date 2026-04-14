@@ -1,6 +1,8 @@
 package user
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/rooted-dating/rooted-server/internal/media"
@@ -74,6 +76,7 @@ func (h *Handler) CreateProfile(c *fiber.Ctx) error {
 	}
 	profile, err := h.service.CreateProfile(c.Context(), u.ID, req)
 	if err != nil {
+		log.Printf("ERROR CreateProfile user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to create profile"})
 	}
 	return c.Status(201).JSON(profile)

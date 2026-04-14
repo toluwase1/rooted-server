@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/redis/go-redis/v9"
+	"github.com/rooted-dating/rooted-server/internal/shared/database"
 )
 
 type TelegramUser struct {
@@ -23,7 +23,7 @@ type TelegramUser struct {
 }
 
 // TelegramAuth validates Telegram Mini App init data and extracts the user.
-func TelegramAuth(botToken string, redisClient *redis.Client) fiber.Handler {
+func TelegramAuth(botToken string, redisClient *database.SafeRedis) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		initData := c.Get("X-Telegram-Init-Data")
 		if initData == "" {
