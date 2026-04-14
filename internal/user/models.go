@@ -75,8 +75,8 @@ type CreateProfileRequest struct {
 	Faith            string           `json:"faith" validate:"omitempty,oneof=christian muslim traditional spiritual not_religious prefer_not_to_say"`
 	FaithImportance  string           `json:"faith_importance" validate:"omitempty,oneof=very_important somewhat not_important"`
 	Bio              string           `json:"bio" validate:"max=150"`
-	CulturalPrompts  []PromptResponse `json:"cultural_prompts" validate:"required,min=2"`
-	PersonalityPrompts []PromptResponse `json:"personality_prompts" validate:"required,min=1"`
+	CulturalPrompts  []PromptResponse `json:"cultural_prompts" validate:"omitempty"`
+	PersonalityPrompts []PromptResponse `json:"personality_prompts" validate:"omitempty"`
 }
 
 type UpdateProfileRequest struct {

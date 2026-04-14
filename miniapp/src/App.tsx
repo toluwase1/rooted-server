@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { api } from './api/client'
 import Nav from './components/Nav'
 import Onboarding from './pages/Onboarding'
+import CompleteProfile from './pages/CompleteProfile'
 import Circle from './pages/Circle'
 import Explore from './pages/Explore'
 import Matches from './pages/Matches'
@@ -19,11 +20,9 @@ export default function App() {
   const location = useLocation()
 
   useEffect(() => {
-    // Tell Telegram the Mini App is ready
     window.Telegram?.WebApp?.ready()
     window.Telegram?.WebApp?.expand()
 
-    // Load user data
     api.getMe().then((data) => {
       setUser(data.user)
       setProfile(data.profile)
@@ -39,6 +38,16 @@ export default function App() {
 
   const onProfileCreated = (newProfile: any) => {
     setProfile(newProfile)
+    navigate('/complete-profile')
+  }
+
+  const onProfileCompleted = () => {
+    // Reload profile to get updated completeness
+    if (user) {
+      api.getMe().then((data) => {
+        setProfile(data.profile)
+      })
+    }
     navigate('/')
   }
 
@@ -46,14 +55,17 @@ export default function App() {
     return <div className="loading">Loading...</div>
   }
 
-  const showNav = !['/onboarding', '/profile/'].some(p => location.pathname.startsWith(p))
-    && location.pathname !== '/onboarding'
+  const hiddenNavPaths = ['/onboarding', '/complete-profile', '/verify']
+  const showNav = !hiddenNavPaths.some(p => location.pathname.startsWith(p))
 
   return (
     <>
       <Routes>
         <Route path="/" element={<Circle user={user} />} />
         <Route path="/onboarding" element={<Onboarding onComplete={onProfileCreated} />} />
+        <Route path="/complete-profile" element={
+          <CompleteProfile profile={profile} onDone={onProfileCompleted} />
+        } />
         <Route path="/explore" element={<Explore user={user} />} />
         <Route path="/matches" element={<Matches user={user} />} />
         <Route path="/profile/:id" element={<ProfileView currentUserId={user?.id} />} />
