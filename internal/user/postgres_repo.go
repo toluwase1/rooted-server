@@ -123,7 +123,7 @@ func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req Cre
 			bio, cultural_prompts, personality_prompts, completeness
 		) VALUES (
 			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9, ST_MakePoint($9, $8)::geography,
+			$6, $7, $8, $9, ST_MakePoint($9::float8, $8::float8)::geography,
 			$10, $11, $12, $13, $14,
 			$15, $16, $17, $18
 		)
@@ -267,7 +267,7 @@ func (r *PostgresRepo) UpdateProfile(ctx context.Context, userID string, req Upd
 	// Update location geography column if coordinates changed
 	if req.Latitude != nil && req.Longitude != nil {
 		_, err = r.db.Exec(ctx,
-			"UPDATE profiles SET location = ST_MakePoint($2, $3)::geography WHERE user_id = $1",
+			"UPDATE profiles SET location = ST_MakePoint($2::float8, $3::float8)::geography WHERE user_id = $1",
 			userID, *req.Longitude, *req.Latitude,
 		)
 		if err != nil {
