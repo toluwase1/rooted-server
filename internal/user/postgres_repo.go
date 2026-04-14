@@ -167,9 +167,12 @@ func (r *PostgresRepo) GetProfile(ctx context.Context, userID string) (*Profile,
 
 	err := r.db.QueryRow(ctx, `
 		SELECT user_id, first_name, date_of_birth, gender, gender_pref,
-		       city, country, latitude, longitude,
-		       heritage, diaspora_tag, intention, faith, faith_importance,
-		       bio, audio_bio_url, cultural_prompts, personality_prompts, completeness,
+		       COALESCE(city, ''), COALESCE(country, ''), COALESCE(latitude, 0), COALESCE(longitude, 0),
+		       COALESCE(heritage, '{}'), COALESCE(diaspora_tag, ''), COALESCE(intention, ''),
+		       COALESCE(faith, ''), COALESCE(faith_importance, ''),
+		       COALESCE(bio, ''), COALESCE(audio_bio_url, ''),
+		       COALESCE(cultural_prompts, '[]'::jsonb), COALESCE(personality_prompts, '[]'::jsonb),
+		       COALESCE(completeness, 0),
 		       created_at, updated_at
 		FROM profiles WHERE user_id = $1
 	`, userID).Scan(
