@@ -48,9 +48,11 @@ func main() {
 
 	rdb, err := database.NewRedis(ctx, cfg.RedisURL)
 	if err != nil {
-		log.Fatalf("Redis: %v", err)
+		log.Printf("Warning: Redis not available: %v (caching disabled)", err)
 	}
-	defer rdb.Close()
+	if rdb != nil {
+		defer rdb.Close()
+	}
 
 	dynConfig := config.NewDynamicConfig(db, rdb)
 	bot := telegram.NewBot(cfg.TelegramBotToken)
