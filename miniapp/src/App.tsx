@@ -61,7 +61,7 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Circle user={user} />} />
+        <Route path="/" element={<Circle user={user} profile={profile} />} />
         <Route path="/onboarding" element={<Onboarding onComplete={onProfileCreated} />} />
         <Route path="/complete-profile" element={
           <CompleteProfile profile={profile} onDone={onProfileCompleted} />

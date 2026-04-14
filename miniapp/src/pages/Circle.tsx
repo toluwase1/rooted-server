@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import SwipeCard from '../components/SwipeCard'
 
 interface Props {
   user: any
+  profile: any
 }
 
-export default function Circle({ user }: Props) {
+export default function Circle({ user, profile }: Props) {
+  const navigate = useNavigate()
   const [candidates, setCandidates] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -52,6 +55,19 @@ export default function Circle({ user }: Props) {
   return (
     <div className="container page">
       <h1 className="page-header">Your Circle</h1>
+
+      {profile && profile.completeness < 100 && (
+        <div className="card" onClick={() => navigate('/complete-profile')}
+          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div>
+            <div style={{ fontWeight: '600', fontSize: '14px' }}>Complete your profile</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              {profile.completeness}% done — add prompts to get 3x more likes
+            </div>
+          </div>
+          <span style={{ color: 'var(--primary)', fontSize: '20px' }}>→</span>
+        </div>
+      )}
 
       {!candidate && candidates.length === 0 && (
         <div className="empty-state">

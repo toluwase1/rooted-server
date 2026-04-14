@@ -42,6 +42,17 @@ export default function Settings({ user, profile }: Props) {
     <div className="container page">
       <h1 className="page-header">Settings</h1>
 
+      {/* Complete profile banner */}
+      {profile && profile.completeness < 100 && (
+        <div className="card" onClick={() => navigate('/complete-profile')}
+          style={{ cursor: 'pointer', background: '#81B29A15', borderLeft: '3px solid var(--accent)' }}>
+          <div style={{ fontWeight: '600', fontSize: '14px' }}>Boost your profile</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            {profile.completeness}% complete — add prompts and photos to get more matches
+          </div>
+        </div>
+      )}
+
       {/* Profile preview */}
       {profile && (
         <div className="card" onClick={() => navigate(`/profile/${profile.user_id}`)}>
