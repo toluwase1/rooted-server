@@ -111,11 +111,9 @@ func (r *PostgresRepo) DeleteUser(ctx context.Context, id string) error {
 func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req CreateProfileRequest) (*Profile, error) {
 	culturalJSON, _ := json.Marshal(req.CulturalPrompts)
 	personalityJSON, _ := json.Marshal(req.PersonalityPrompts)
-
 	completeness := calculateCompleteness(req)
 
-	var p Profile
-	err := r.db.QueryRow(ctx, `
+	_, err := r.db.Exec(ctx, `
 		INSERT INTO profiles (
 			user_id, first_name, date_of_birth, gender, gender_pref,
 			city, country, latitude, longitude, location,
@@ -147,37 +145,25 @@ func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req Cre
 			personality_prompts = EXCLUDED.personality_prompts,
 			completeness = EXCLUDED.completeness,
 			updated_at = NOW()
-		RETURNING user_id, first_name, date_of_birth, gender, gender_pref,
-		          city, country, latitude, longitude,
-		          heritage, diaspora_tag, intention, faith, faith_importance,
-		          bio, cultural_prompts, personality_prompts, completeness,
-		          created_at, updated_at
 	`,
 		userID, req.FirstName, req.DateOfBirth, req.Gender, req.GenderPref,
 		req.City, req.Country, req.Latitude, req.Longitude,
 		req.Heritage, req.DiasporaTag, req.Intention, req.Faith, req.FaithImportance,
 		req.Bio, culturalJSON, personalityJSON, completeness,
-		req.Longitude, req.Latitude, // $19, $20 — separate params for ST_MakePoint
-	).Scan(
-		&p.UserID, &p.FirstName, &p.DateOfBirth, &p.Gender, &p.GenderPref,
-		&p.City, &p.Country, &p.Latitude, &p.Longitude,
-		&p.Heritage, &p.DiasporaTag, &p.Intention, &p.Faith, &p.FaithImportance,
-		&p.Bio, &culturalJSON, &personalityJSON, &p.Completeness,
-		&p.CreatedAt, &p.UpdatedAt,
+		req.Longitude, req.Latitude,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating profile: %w", err)
 	}
 
-	json.Unmarshal(culturalJSON, &p.CulturalPrompts)
-	json.Unmarshal(personalityJSON, &p.PersonalityPrompts)
-
-	return &p, nil
+	// Fetch the created/updated profile with proper type scanning
+	return r.GetProfile(ctx, userID)
 }
 
 func (r *PostgresRepo) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var p Profile
 	var culturalJSON, personalityJSON []byte
+	var dob time.Time
 
 	err := r.db.QueryRow(ctx, `
 		SELECT user_id, first_name, date_of_birth, gender, gender_pref,
@@ -187,7 +173,7 @@ func (r *PostgresRepo) GetProfile(ctx context.Context, userID string) (*Profile,
 		       created_at, updated_at
 		FROM profiles WHERE user_id = $1
 	`, userID).Scan(
-		&p.UserID, &p.FirstName, &p.DateOfBirth, &p.Gender, &p.GenderPref,
+		&p.UserID, &p.FirstName, &dob, &p.Gender, &p.GenderPref,
 		&p.City, &p.Country, &p.Latitude, &p.Longitude,
 		&p.Heritage, &p.DiasporaTag, &p.Intention, &p.Faith, &p.FaithImportance,
 		&p.Bio, &p.AudioBioURL, &culturalJSON, &personalityJSON, &p.Completeness,
@@ -200,6 +186,7 @@ func (r *PostgresRepo) GetProfile(ctx context.Context, userID string) (*Profile,
 		return nil, fmt.Errorf("getting profile: %w", err)
 	}
 
+	p.DateOfBirth = dob.Format("2006-01-02")
 	json.Unmarshal(culturalJSON, &p.CulturalPrompts)
 	json.Unmarshal(personalityJSON, &p.PersonalityPrompts)
 
