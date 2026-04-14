@@ -173,8 +173,8 @@ body {
   transition: border-color 0.2s;
 }
 .prompt-option.selected {
-  border-color: var(--primary);
-  background: #E07A5F10;
+  border-color: var(--accent);
+  background: #81B29A15;
 }
 
 /* Match list */
@@ -247,7 +247,7 @@ body {
   cursor: pointer;
   transition: all 0.2s;
 }
-.tag.selected { background: var(--primary); color: white; border-color: var(--primary); }
+.tag.selected { background: var(--accent); color: white; border-color: var(--accent); }
 
 /* Loading */
 .loading {
