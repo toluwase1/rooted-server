@@ -36,16 +36,27 @@ func (h *Handler) RegisterRoutes(api fiber.Router) {
 }
 
 func (h *Handler) getUser(c *fiber.Ctx) (*User, error) {
-	tgUser := c.Locals("telegram_user").(middleware.TelegramUser)
+	tgUser, ok := c.Locals("telegram_user").(middleware.TelegramUser)
+	if !ok {
+		return nil, fiber.NewError(401, "unauthorized")
+	}
 	u, _, err := h.service.FindOrCreateUser(c.Context(), tgUser.ID, tgUser.Username)
-	return u, err
+	if err != nil {
+		log.Printf("ERROR getUser telegram_id=%d: %v", tgUser.ID, err)
+		return nil, fiber.NewError(500, "failed to authenticate user")
+	}
+	return u, nil
 }
 
 func (h *Handler) GetMe(c *fiber.Ctx) error {
-	tgUser := c.Locals("telegram_user").(middleware.TelegramUser)
+	tgUser, ok := c.Locals("telegram_user").(middleware.TelegramUser)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	u, isNew, err := h.service.FindOrCreateUser(c.Context(), tgUser.ID, tgUser.Username)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to find/create user"})
+		log.Printf("ERROR GetMe telegram_id=%d: %v", tgUser.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load user"})
 	}
 	var profile *Profile
 	if !isNew {
@@ -55,9 +66,14 @@ func (h *Handler) GetMe(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetProfileByID(c *fiber.Ctx) error {
-	profile, err := h.service.GetProfile(c.Context(), c.Params("id"))
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "profile id required"})
+	}
+	profile, err := h.service.GetProfile(c.Context(), id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get profile"})
+		log.Printf("ERROR GetProfile id=%s: %v", id, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load profile"})
 	}
 	if profile == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "profile not found"})
@@ -68,12 +84,40 @@ func (h *Handler) GetProfileByID(c *fiber.Ctx) error {
 func (h *Handler) CreateProfile(c *fiber.Ctx) error {
 	u, err := h.getUser(c)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "auth failed"})
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	var req CreateProfileRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request body: " + err.Error()})
 	}
+	if req.FirstName == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "first_name is required"})
+	}
+	if req.DateOfBirth == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "date_of_birth is required"})
+	}
+	if req.Gender == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "gender is required"})
+	}
+	if req.GenderPref == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "gender_pref is required"})
+	}
+	if len(req.Heritage) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "at least one heritage selection required"})
+	}
+	if req.DiasporaTag == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "diaspora_tag is required"})
+	}
+	if req.Intention == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "intention is required"})
+	}
+	if len(req.CulturalPrompts) < 2 {
+		return c.Status(400).JSON(fiber.Map{"error": "at least 2 cultural prompts required"})
+	}
+	if len(req.PersonalityPrompts) < 1 {
+		return c.Status(400).JSON(fiber.Map{"error": "at least 1 personality prompt required"})
+	}
+
 	profile, err := h.service.CreateProfile(c.Context(), u.ID, req)
 	if err != nil {
 		log.Printf("ERROR CreateProfile user=%s: %v", u.ID, err)
@@ -85,84 +129,117 @@ func (h *Handler) CreateProfile(c *fiber.Ctx) error {
 func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 	u, err := h.getUser(c)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "auth failed"})
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 	var req UpdateProfileRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request body: " + err.Error()})
 	}
 	if err := h.service.UpdateProfile(c.Context(), u.ID, req); err != nil {
+		log.Printf("ERROR UpdateProfile user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to update profile"})
 	}
 	return c.JSON(fiber.Map{"status": "updated"})
 }
 
 func (h *Handler) PauseProfile(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
-	h.service.PauseProfile(c.Context(), u.ID)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	if err := h.service.PauseProfile(c.Context(), u.ID); err != nil {
+		log.Printf("ERROR PauseProfile user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to pause profile"})
+	}
 	return c.JSON(fiber.Map{"status": "paused"})
 }
 
 func (h *Handler) ResumeProfile(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
-	h.service.ResumeProfile(c.Context(), u.ID)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	if err := h.service.ResumeProfile(c.Context(), u.ID); err != nil {
+		log.Printf("ERROR ResumeProfile user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to resume profile"})
+	}
 	return c.JSON(fiber.Map{"status": "resumed"})
 }
 
 func (h *Handler) DeleteAccount(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
-	h.service.DeleteAccount(c.Context(), u.ID)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	if err := h.service.DeleteAccount(c.Context(), u.ID); err != nil {
+		log.Printf("ERROR DeleteAccount user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to delete account"})
+	}
 	return c.JSON(fiber.Map{"status": "deleted"})
 }
 
 func (h *Handler) BlockUser(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
-	h.service.BlockUser(c.Context(), u.ID, c.Params("userId"))
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	targetID := c.Params("userId")
+	if targetID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "user id required"})
+	}
+	if targetID == u.ID {
+		return c.Status(400).JSON(fiber.Map{"error": "cannot block yourself"})
+	}
+	if err := h.service.BlockUser(c.Context(), u.ID, targetID); err != nil {
+		log.Printf("ERROR BlockUser user=%s target=%s: %v", u.ID, targetID, err)
+	}
 	return c.JSON(fiber.Map{"status": "blocked"})
 }
 
 func (h *Handler) UnblockUser(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
-	h.service.UnblockUser(c.Context(), u.ID, c.Params("userId"))
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	targetID := c.Params("userId")
+	if targetID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "user id required"})
+	}
+	if err := h.service.UnblockUser(c.Context(), u.ID, targetID); err != nil {
+		log.Printf("ERROR UnblockUser user=%s target=%s: %v", u.ID, targetID, err)
+	}
 	return c.JSON(fiber.Map{"status": "unblocked"})
 }
 
-// VerifyPhoto handles photo verification — compares selfie to profile photos.
-// For MVP: marks user as verified (face matching via Rekognition added later).
 func (h *Handler) VerifyPhoto(c *fiber.Ctx) error {
 	u, err := h.getUser(c)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "auth failed"})
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 
 	_, err = c.FormFile("selfie")
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "no selfie provided"})
+		return c.Status(400).JSON(fiber.Map{"error": "selfie photo required"})
 	}
 
-	// TODO: Compare selfie to profile photos using AWS Rekognition CompareFaces.
-	// For MVP, we trust the selfie flow and mark as verified.
-	// The selfie is not stored — just used for comparison.
-
 	if err := h.service.VerifyPhoto(c.Context(), u.ID); err != nil {
+		log.Printf("ERROR VerifyPhoto user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "verification failed"})
 	}
 
 	return c.JSON(fiber.Map{"status": "verified", "verification": "photo_verified"})
 }
 
-// UploadPhoto handles multipart file upload for profile photos.
 func (h *Handler) UploadPhoto(c *fiber.Ctx) error {
 	if h.mediaService == nil {
-		return c.Status(503).JSON(fiber.Map{"error": "photo uploads not configured"})
+		return c.Status(503).JSON(fiber.Map{"error": "photo uploads not configured — R2 storage not set up"})
 	}
 
 	u, err := h.getUser(c)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "auth failed"})
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 
-	// Check photo limit (max 6)
 	existing, _ := h.service.repo.GetPhotos(c.Context(), u.ID)
 	if len(existing) >= 6 {
 		return c.Status(400).JSON(fiber.Map{"error": "maximum 6 photos allowed"})
@@ -170,28 +247,31 @@ func (h *Handler) UploadPhoto(c *fiber.Ctx) error {
 
 	file, err := c.FormFile("photo")
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "no photo file provided"})
+		return c.Status(400).JSON(fiber.Map{"error": "photo file required"})
 	}
 
-	// Validate file size (5MB max)
 	if file.Size > 5*1024*1024 {
 		return c.Status(400).JSON(fiber.Map{"error": "photo must be under 5MB"})
 	}
 
-	// Open file
+	contentType := file.Header.Get("Content-Type")
+	if contentType != "" && contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
+		return c.Status(400).JSON(fiber.Map{"error": "only JPEG, PNG, and WebP images are allowed"})
+	}
+
 	f, err := file.Open()
 	if err != nil {
+		log.Printf("ERROR UploadPhoto open file user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to read file"})
 	}
 	defer f.Close()
 
-	// Upload to R2
 	result, err := h.mediaService.UploadPhoto(c.Context(), u.ID, f, file.Filename)
 	if err != nil {
+		log.Printf("ERROR UploadPhoto upload user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to upload photo"})
 	}
 
-	// Save photo record
 	position := len(existing)
 	photo := Photo{
 		ID:           uuid.New().String(),
@@ -204,13 +284,13 @@ func (h *Handler) UploadPhoto(c *fiber.Ctx) error {
 	}
 
 	if err := h.service.AddPhoto(c.Context(), photo); err != nil {
+		log.Printf("ERROR UploadPhoto save user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to save photo"})
 	}
 
 	return c.Status(201).JSON(photo)
 }
 
-// GetUploadURL returns a presigned URL for direct client-to-R2 upload.
 func (h *Handler) GetUploadURL(c *fiber.Ctx) error {
 	if h.mediaService == nil {
 		return c.Status(503).JSON(fiber.Map{"error": "photo uploads not configured"})
@@ -218,40 +298,57 @@ func (h *Handler) GetUploadURL(c *fiber.Ctx) error {
 
 	u, err := h.getUser(c)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "auth failed"})
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 	}
 
 	ext := c.Query("ext", ".jpg")
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" {
+		return c.Status(400).JSON(fiber.Map{"error": "only .jpg, .png, .webp extensions allowed"})
+	}
+
 	url, fileID, err := h.mediaService.GeneratePresignedUploadURL(c.Context(), u.ID, ext)
 	if err != nil {
+		log.Printf("ERROR GetUploadURL user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to generate upload URL"})
 	}
 
 	return c.JSON(fiber.Map{"upload_url": url, "file_id": fileID})
 }
 
-// DeletePhoto removes a photo from profile and storage.
 func (h *Handler) DeletePhoto(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	photoID := c.Params("photoId")
+	if photoID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "photo id required"})
+	}
 
 	if err := h.service.DeletePhoto(c.Context(), photoID, u.ID); err != nil {
+		log.Printf("ERROR DeletePhoto user=%s photo=%s: %v", u.ID, photoID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to delete photo"})
 	}
 	return c.JSON(fiber.Map{"status": "deleted"})
 }
 
-// ReorderPhotos updates the display order of photos.
 func (h *Handler) ReorderPhotos(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	var body struct {
 		PhotoIDs []string `json:"photo_ids"`
 	}
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request"})
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if len(body.PhotoIDs) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "photo_ids required"})
 	}
 
 	if err := h.service.ReorderPhotos(c.Context(), u.ID, body.PhotoIDs); err != nil {
+		log.Printf("ERROR ReorderPhotos user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to reorder photos"})
 	}
 	return c.JSON(fiber.Map{"status": "reordered"})

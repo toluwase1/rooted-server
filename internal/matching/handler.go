@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"log"
 	"strconv"
 	"strings"
 
@@ -12,9 +13,9 @@ import (
 )
 
 type Handler struct {
-	service     *Service
-	userService *user.Service
-	chatService *chat.Service
+	service      *Service
+	userService  *user.Service
+	chatService  *chat.Service
 	notifService *notification.Service
 }
 
@@ -22,7 +23,6 @@ func NewHandler(s *Service, us *user.Service, cs *chat.Service, ns *notification
 	return &Handler{service: s, userService: us, chatService: cs, notifService: ns}
 }
 
-// RegisterRoutes registers all matching/discovery API routes.
 func (h *Handler) RegisterRoutes(api fiber.Router) {
 	api.Get("/circle", h.GetCircle)
 	api.Get("/explore", h.GetExplore)
@@ -33,30 +33,55 @@ func (h *Handler) RegisterRoutes(api fiber.Router) {
 }
 
 func (h *Handler) getUser(c *fiber.Ctx) (*user.User, error) {
-	tgUser := c.Locals("telegram_user").(middleware.TelegramUser)
+	tgUser, ok := c.Locals("telegram_user").(middleware.TelegramUser)
+	if !ok {
+		return nil, fiber.NewError(401, "unauthorized")
+	}
 	u, _, err := h.userService.FindOrCreateUser(c.Context(), tgUser.ID, tgUser.Username)
-	return u, err
+	if err != nil {
+		log.Printf("ERROR getUser telegram_id=%d: %v", tgUser.ID, err)
+		return nil, err
+	}
+	return u, nil
 }
 
 func (h *Handler) GetCircle(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	profile, err := h.userService.GetProfile(c.Context(), u.ID)
-	if err != nil || profile == nil {
+	if err != nil {
+		log.Printf("ERROR GetCircle get profile user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load profile"})
+	}
+	if profile == nil {
 		return c.Status(400).JSON(fiber.Map{"error": "complete your profile first"})
 	}
 
 	filters := h.buildFilters(profile, c)
 	candidates, err := h.service.GetDailyCircle(c.Context(), u.ID, filters)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get matches"})
+		log.Printf("ERROR GetCircle matching user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load matches"})
+	}
+	if candidates == nil {
+		candidates = []ScoredCandidate{}
 	}
 	return c.JSON(fiber.Map{"candidates": candidates, "count": len(candidates)})
 }
 
 func (h *Handler) GetExplore(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	profile, err := h.userService.GetProfile(c.Context(), u.ID)
-	if err != nil || profile == nil {
+	if err != nil {
+		log.Printf("ERROR GetExplore get profile user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load profile"})
+	}
+	if profile == nil {
 		return c.Status(400).JSON(fiber.Map{"error": "complete your profile first"})
 	}
 
@@ -73,7 +98,11 @@ func (h *Handler) GetExplore(c *fiber.Ctx) error {
 
 	candidates, err := h.service.GetExploreFeed(c.Context(), u.ID, filters, offset)
 	if err != nil {
+		log.Printf("ERROR GetExplore matching user=%s: %v", u.ID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "failed to load explore"})
+	}
+	if candidates == nil {
+		candidates = []ScoredCandidate{}
 	}
 	return c.JSON(fiber.Map{
 		"candidates":       candidates,
@@ -83,14 +112,27 @@ func (h *Handler) GetExplore(c *fiber.Ctx) error {
 }
 
 func (h *Handler) Swipe(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	var req SwipeRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid request"})
+		return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.CandidateID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "candidate_id is required"})
+	}
+	if req.Action != "like" && req.Action != "pass" {
+		return c.Status(400).JSON(fiber.Map{"error": "action must be 'like' or 'pass'"})
+	}
+	if req.CandidateID == u.ID {
+		return c.Status(400).JSON(fiber.Map{"error": "cannot swipe on yourself"})
 	}
 
 	match, err := h.service.Swipe(c.Context(), u.ID, req)
 	if err != nil {
+		log.Printf("ERROR Swipe user=%s candidate=%s: %v", u.ID, req.CandidateID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "swipe failed"})
 	}
 
@@ -102,37 +144,45 @@ func (h *Handler) Swipe(c *fiber.Ctx) error {
 		result["match"] = match
 		result["is_match"] = true
 
-		// Create conversation
-		conv, _ := h.chatService.CreateConversation(c.Context(), match.ID, match.UserAID, match.UserBID)
+		conv, err := h.chatService.CreateConversation(c.Context(), match.ID, match.UserAID, match.UserBID)
+		if err != nil {
+			log.Printf("ERROR Swipe create conversation match=%s: %v", match.ID, err)
+		}
 		if conv != nil {
 			result["conversation_id"] = conv.ID
 		}
 
-		// Notify both users
-		otherID := match.UserBID
-		if u.ID == match.UserBID {
-			otherID = match.UserAID
-		}
-		otherProfile, _ := h.userService.GetProfile(c.Context(), otherID)
-		myProfile, _ := h.userService.GetProfile(c.Context(), u.ID)
-
-		if otherProfile != nil && myProfile != nil {
-			otherChatID, _ := h.chatService.GetRecipientTelegramChatID(c.Context(), otherID)
-			myChatID, _ := h.chatService.GetRecipientTelegramChatID(c.Context(), u.ID)
-			if otherChatID != 0 && myChatID != 0 {
-				h.notifService.NotifyMatch(c.Context(), myChatID, otherChatID, myProfile.FirstName, otherProfile.FirstName)
+		// Notify both users (best effort — don't fail the swipe if notification fails)
+		go func() {
+			otherID := match.UserBID
+			if u.ID == match.UserBID {
+				otherID = match.UserAID
 			}
-		}
+			otherProfile, _ := h.userService.GetProfile(c.Context(), otherID)
+			myProfile, _ := h.userService.GetProfile(c.Context(), u.ID)
+
+			if otherProfile != nil && myProfile != nil {
+				otherChatID, _ := h.chatService.GetRecipientTelegramChatID(c.Context(), otherID)
+				myChatID, _ := h.chatService.GetRecipientTelegramChatID(c.Context(), u.ID)
+				if otherChatID != 0 && myChatID != 0 {
+					h.notifService.NotifyMatch(c.Context(), myChatID, otherChatID, myProfile.FirstName, otherProfile.FirstName)
+				}
+			}
+		}()
 	}
 
 	return c.JSON(result)
 }
 
 func (h *Handler) GetMatches(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	matches, err := h.service.GetMatches(c.Context(), u.ID)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get matches"})
+		log.Printf("ERROR GetMatches user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load matches"})
 	}
 
 	var enriched []fiber.Map
@@ -144,23 +194,48 @@ func (h *Handler) GetMatches(c *fiber.Ctx) error {
 		profile, _ := h.userService.GetProfile(c.Context(), otherID)
 		enriched = append(enriched, fiber.Map{"match": m, "profile": profile})
 	}
+	if enriched == nil {
+		enriched = []fiber.Map{}
+	}
 
 	return c.JSON(fiber.Map{"matches": enriched, "count": len(enriched)})
 }
 
 func (h *Handler) GetLikes(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
 	if u.Subscription == "free" {
 		likes, _ := h.service.GetLikesReceived(c.Context(), u.ID, 100)
-		return c.JSON(fiber.Map{"count": len(likes), "upgrade": "Upgrade to Plus to see who liked you"})
+		count := 0
+		if likes != nil {
+			count = len(likes)
+		}
+		return c.JSON(fiber.Map{"count": count, "upgrade": "Upgrade to Plus to see who liked you"})
 	}
-	likes, _ := h.service.GetLikesReceived(c.Context(), u.ID, 50)
+	likes, err := h.service.GetLikesReceived(c.Context(), u.ID, 50)
+	if err != nil {
+		log.Printf("ERROR GetLikes user=%s: %v", u.ID, err)
+	}
+	if likes == nil {
+		likes = []Swipe{}
+	}
 	return c.JSON(fiber.Map{"likes": likes, "count": len(likes)})
 }
 
 func (h *Handler) Unmatch(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
-	h.service.Unmatch(c.Context(), u.ID, c.Params("matchId"))
+	u, err := h.getUser(c)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+	}
+	matchID := c.Params("matchId")
+	if matchID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "match id required"})
+	}
+	if err := h.service.Unmatch(c.Context(), u.ID, matchID); err != nil {
+		log.Printf("ERROR Unmatch user=%s match=%s: %v", u.ID, matchID, err)
+	}
 	return c.JSON(fiber.Map{"status": "unmatched"})
 }
 
