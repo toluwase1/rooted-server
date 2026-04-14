@@ -1,0 +1,13 @@
+bin/
+.env
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+.DS_Store
+node_modules/
+miniapp/dist/
+admin/dist/
