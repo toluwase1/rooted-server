@@ -127,6 +127,26 @@ func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req Cre
 			$10, $11, $12, $13, $14,
 			$15, $16, $17, $18
 		)
+		ON CONFLICT (user_id) DO UPDATE SET
+			first_name = EXCLUDED.first_name,
+			date_of_birth = EXCLUDED.date_of_birth,
+			gender = EXCLUDED.gender,
+			gender_pref = EXCLUDED.gender_pref,
+			city = EXCLUDED.city,
+			country = EXCLUDED.country,
+			latitude = EXCLUDED.latitude,
+			longitude = EXCLUDED.longitude,
+			location = EXCLUDED.location,
+			heritage = EXCLUDED.heritage,
+			diaspora_tag = EXCLUDED.diaspora_tag,
+			intention = EXCLUDED.intention,
+			faith = EXCLUDED.faith,
+			faith_importance = EXCLUDED.faith_importance,
+			bio = EXCLUDED.bio,
+			cultural_prompts = EXCLUDED.cultural_prompts,
+			personality_prompts = EXCLUDED.personality_prompts,
+			completeness = EXCLUDED.completeness,
+			updated_at = NOW()
 		RETURNING user_id, first_name, date_of_birth, gender, gender_pref,
 		          city, country, latitude, longitude,
 		          heritage, diaspora_tag, intention, faith, faith_importance,
