@@ -72,8 +72,8 @@ type CreateProfileRequest struct {
 	Heritage         []string         `json:"heritage" validate:"required,min=1"`
 	DiasporaTag      string           `json:"diaspora_tag" validate:"required,oneof=born_in_africa diaspora_1st diaspora_2nd returnee explorer"`
 	Intention        string           `json:"intention" validate:"required,oneof=dating friendship both"`
-	Faith            string           `json:"faith"`
-	FaithImportance  string           `json:"faith_importance" validate:"oneof=very_important somewhat not_important"`
+	Faith            string           `json:"faith" validate:"omitempty,oneof=christian muslim traditional spiritual not_religious prefer_not_to_say"`
+	FaithImportance  string           `json:"faith_importance" validate:"omitempty,oneof=very_important somewhat not_important"`
 	Bio              string           `json:"bio" validate:"max=150"`
 	CulturalPrompts  []PromptResponse `json:"cultural_prompts" validate:"required,min=2"`
 	PersonalityPrompts []PromptResponse `json:"personality_prompts" validate:"required,min=1"`

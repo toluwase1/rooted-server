@@ -123,6 +123,44 @@ export default function Users() {
                 <div>Joined: {new Date(selectedUser.user.created_at).toLocaleString()}</div>
               </div>
 
+              {/* Photos */}
+              {selectedUser.photos?.length > 0 && (
+                <>
+                  <div className="card-title">Photos ({selectedUser.photos.length})</div>
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '6px', marginBottom: '16px',
+                  }}>
+                    {selectedUser.photos.map((photo: any) => (
+                      <div key={photo.id} style={{
+                        aspectRatio: '1', borderRadius: '8px', overflow: 'hidden',
+                        cursor: 'pointer', position: 'relative',
+                        border: photo.moderation_status === 'rejected' ? '2px solid var(--red)' : '1px solid var(--border)',
+                      }}
+                        onClick={() => window.open(photo.url_large, '_blank')}
+                      >
+                        <img src={photo.url_medium || photo.url_thumbnail} alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {photo.is_primary && (
+                          <span style={{
+                            position: 'absolute', bottom: '2px', left: '2px',
+                            background: 'var(--primary)', color: '#fff',
+                            padding: '1px 5px', borderRadius: '4px', fontSize: '9px',
+                          }}>Primary</span>
+                        )}
+                        {photo.moderation_status !== 'approved' && (
+                          <span style={{
+                            position: 'absolute', top: '2px', right: '2px',
+                            background: photo.moderation_status === 'rejected' ? 'var(--red)' : 'var(--yellow)',
+                            color: '#fff', padding: '1px 5px', borderRadius: '4px', fontSize: '9px',
+                          }}>{photo.moderation_status}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {selectedUser.profile?.city && (
                 <>
                   <div className="card-title">Profile</div>

@@ -343,6 +343,30 @@ func (h *Handler) GetUser(c *fiber.Ctx) error {
 		FROM profiles WHERE user_id = $1
 	`, id).Scan(&firstName, &city, &country, &heritage, &bio, &completeness)
 
+	// Get photos
+	photoRows, _ := h.db.Query(c.Context(), `
+		SELECT id, url_thumbnail, url_medium, url_large, position, is_primary, moderation_status
+		FROM photos WHERE user_id = $1 ORDER BY position
+	`, id)
+	var photos []fiber.Map
+	if photoRows != nil {
+		defer photoRows.Close()
+		for photoRows.Next() {
+			var pid, urlThumb, urlMed, urlLarge, modStatus string
+			var pos int
+			var isPrimary bool
+			photoRows.Scan(&pid, &urlThumb, &urlMed, &urlLarge, &pos, &isPrimary, &modStatus)
+			photos = append(photos, fiber.Map{
+				"id": pid, "url_thumbnail": urlThumb, "url_medium": urlMed,
+				"url_large": urlLarge, "position": pos, "is_primary": isPrimary,
+				"moderation_status": modStatus,
+			})
+		}
+	}
+	if photos == nil {
+		photos = []fiber.Map{}
+	}
+
 	// Get stats
 	var matchCount, messageCount, reportCount int
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM matches WHERE (user_a_id = $1 OR user_b_id = $1) AND status = 'active'", id).Scan(&matchCount)
@@ -355,6 +379,7 @@ func (h *Handler) GetUser(c *fiber.Ctx) error {
 			"first_name": firstName, "city": city, "country": country,
 			"heritage": heritage, "bio": bio, "completeness": completeness,
 		},
+		"photos": photos,
 		"stats": fiber.Map{
 			"matches":  matchCount,
 			"messages": messageCount,

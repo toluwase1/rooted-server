@@ -26,15 +26,36 @@ const PERSONALITY_PROMPTS = [
   'I recently discovered...',
 ]
 
-const HERITAGE_OPTIONS = [
-  'Nigerian', 'Ghanaian', 'Kenyan', 'Ethiopian', 'Cameroonian',
-  'South African', 'Tanzanian', 'Ugandan', 'Senegalese', 'Congolese',
-  'Zimbabwean', 'Somali', 'Eritrean', 'Sierra Leonean', 'Liberian',
-  'African American', 'Caribbean', 'British African', 'French African', 'Other',
+const HERITAGE_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Nigerian', value: 'nigerian' },
+  { label: 'Ghanaian', value: 'ghanaian' },
+  { label: 'Kenyan', value: 'kenyan' },
+  { label: 'Ethiopian', value: 'ethiopian' },
+  { label: 'Cameroonian', value: 'cameroonian' },
+  { label: 'South African', value: 'south_african' },
+  { label: 'Tanzanian', value: 'tanzanian' },
+  { label: 'Ugandan', value: 'ugandan' },
+  { label: 'Senegalese', value: 'senegalese' },
+  { label: 'Congolese', value: 'congolese' },
+  { label: 'Zimbabwean', value: 'zimbabwean' },
+  { label: 'Somali', value: 'somali' },
+  { label: 'Eritrean', value: 'eritrean' },
+  { label: 'Sierra Leonean', value: 'sierra_leonean' },
+  { label: 'Liberian', value: 'liberian' },
+  { label: 'African American', value: 'african_american' },
+  { label: 'Caribbean', value: 'caribbean' },
+  { label: 'British African', value: 'british_african' },
+  { label: 'French African', value: 'french_african' },
+  { label: 'Other', value: 'other' },
 ]
 
-const FAITH_OPTIONS = [
-  'Christian', 'Muslim', 'Traditional', 'Spiritual', 'Not religious', 'Prefer not to say',
+const FAITH_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Christian', value: 'christian' },
+  { label: 'Muslim', value: 'muslim' },
+  { label: 'Traditional', value: 'traditional' },
+  { label: 'Spiritual', value: 'spiritual' },
+  { label: 'Not religious', value: 'not_religious' },
+  { label: 'Prefer not to say', value: 'prefer_not_to_say' },
 ]
 
 interface Props {
@@ -71,13 +92,12 @@ export default function Onboarding({ onComplete }: Props) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const toggleHeritage = (h: string) => {
-    const lower = h.toLowerCase()
+  const toggleHeritage = (value: string) => {
     setForm((prev) => ({
       ...prev,
-      heritage: prev.heritage.includes(lower)
-        ? prev.heritage.filter((x) => x !== lower)
-        : [...prev.heritage, lower],
+      heritage: prev.heritage.includes(value)
+        ? prev.heritage.filter((x) => x !== value)
+        : [...prev.heritage, value],
     }))
   }
 
@@ -203,9 +223,9 @@ export default function Onboarding({ onComplete }: Props) {
         <label>Heritage (select all that apply)</label>
         <div className="tag-selector">
           {HERITAGE_OPTIONS.map((h) => (
-            <div key={h} className={`tag ${form.heritage.includes(h.toLowerCase()) ? 'selected' : ''}`}
-              onClick={() => toggleHeritage(h)}>
-              {h}
+            <div key={h.value} className={`tag ${form.heritage.includes(h.value) ? 'selected' : ''}`}
+              onClick={() => toggleHeritage(h.value)}>
+              {h.label}
             </div>
           ))}
         </div>
@@ -248,9 +268,9 @@ export default function Onboarding({ onComplete }: Props) {
         <label>Faith</label>
         <div className="tag-selector">
           {FAITH_OPTIONS.map((f) => (
-            <div key={f} className={`tag ${form.faith === f.toLowerCase() ? 'selected' : ''}`}
-              onClick={() => update('faith', f.toLowerCase())}>
-              {f}
+            <div key={f.value} className={`tag ${form.faith === f.value ? 'selected' : ''}`}
+              onClick={() => update('faith', f.value)}>
+              {f.label}
             </div>
           ))}
         </div>
