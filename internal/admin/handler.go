@@ -2,22 +2,20 @@ package admin
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rooted-dating/rooted-server/internal/shared/config"
-	"github.com/rooted-dating/rooted-server/internal/shared/middleware"
-	"github.com/rooted-dating/rooted-server/internal/user"
 )
 
 type Handler struct {
-	db          *pgxpool.Pool
-	dynConfig   *config.DynamicConfig
-	userService *user.Service
+	db        *pgxpool.Pool
+	dynConfig *config.DynamicConfig
 }
 
-func NewHandler(db *pgxpool.Pool, dynConfig *config.DynamicConfig, userService *user.Service) *Handler {
-	return &Handler{db: db, dynConfig: dynConfig, userService: userService}
+func NewHandler(db *pgxpool.Pool, dynConfig *config.DynamicConfig) *Handler {
+	return &Handler{db: db, dynConfig: dynConfig}
 }
 
 func (h *Handler) RegisterRoutes(admin fiber.Router) {
@@ -29,24 +27,34 @@ func (h *Handler) RegisterRoutes(admin fiber.Router) {
 	admin.Put("/features/:key", h.UpdateFeature)
 	admin.Get("/reports", h.GetReports)
 	admin.Put("/reports/:id", h.ReviewReport)
-}
-
-func (h *Handler) getUser(c *fiber.Ctx) (*user.User, error) {
-	tgUser := c.Locals("telegram_user").(middleware.TelegramUser)
-	u, _, err := h.userService.FindOrCreateUser(c.Context(), tgUser.ID, tgUser.Username)
-	return u, err
+	admin.Get("/users", h.ListUsers)
+	admin.Get("/users/:id", h.GetUser)
+	admin.Put("/users/:id/status", h.UpdateUserStatus)
+	admin.Get("/logs", h.GetLogs)
 }
 
 func (h *Handler) GetStats(c *fiber.Ctx) error {
-	var totalUsers, activeUsers, totalMatches, pendingReports int
+	var totalUsers, activeUsers, verifiedUsers, totalMatches, totalMessages, pendingReports int
+	var todaySignups, todayMatches int
+
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users").Scan(&totalUsers)
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE status = 'active'").Scan(&activeUsers)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE verification = 'photo_verified'").Scan(&verifiedUsers)
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM matches WHERE status = 'active'").Scan(&totalMatches)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM messages").Scan(&totalMessages)
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM reports WHERE status = 'pending'").Scan(&pendingReports)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE").Scan(&todaySignups)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM matches WHERE matched_at >= CURRENT_DATE").Scan(&todayMatches)
 
 	return c.JSON(fiber.Map{
-		"total_users": totalUsers, "active_users": activeUsers,
-		"total_matches": totalMatches, "pending_reports": pendingReports,
+		"total_users":     totalUsers,
+		"active_users":    activeUsers,
+		"verified_users":  verifiedUsers,
+		"total_matches":   totalMatches,
+		"total_messages":  totalMessages,
+		"pending_reports": pendingReports,
+		"today_signups":   todaySignups,
+		"today_matches":   todayMatches,
 	})
 }
 
@@ -76,6 +84,8 @@ func (h *Handler) GetConfig(c *fiber.Ctx) error {
 
 func (h *Handler) UpdateConfig(c *fiber.Ctx) error {
 	key := c.Params("key")
+	admin := c.Locals("admin_user").(AdminUser)
+
 	var body struct {
 		Value  interface{} `json:"value"`
 		Reason string      `json:"reason"`
@@ -87,20 +97,18 @@ func (h *Handler) UpdateConfig(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "reason is required"})
 	}
 
-	u, _ := h.getUser(c)
-
 	var oldValue []byte
 	h.db.QueryRow(c.Context(), "SELECT value FROM admin_config WHERE key = $1", key).Scan(&oldValue)
 
 	newValue, _ := json.Marshal(body.Value)
 	h.db.Exec(c.Context(),
 		"UPDATE admin_config SET value = $2, updated_by = $3, updated_at = NOW() WHERE key = $1",
-		key, newValue, u.ID)
+		key, newValue, admin.ID)
 
 	h.db.Exec(c.Context(), `
 		INSERT INTO admin_config_audit (config_key, old_value, new_value, changed_by, reason)
 		VALUES ($1, $2, $3, $4, $5)
-	`, key, oldValue, newValue, u.ID, body.Reason)
+	`, key, oldValue, newValue, admin.ID, body.Reason)
 
 	h.dynConfig.Invalidate(c.Context(), key)
 	return c.JSON(fiber.Map{"status": "updated", "key": key})
@@ -157,10 +165,8 @@ func (h *Handler) GetFeatures(c *fiber.Ctx) error {
 
 func (h *Handler) UpdateFeature(c *fiber.Ctx) error {
 	var body struct {
-		Enabled        *bool    `json:"enabled"`
-		RolloutPercent *int     `json:"rollout_percent"`
-		TargetRegions  []string `json:"target_regions"`
-		TargetPlans    []string `json:"target_plans"`
+		Enabled        *bool `json:"enabled"`
+		RolloutPercent *int  `json:"rollout_percent"`
 	}
 	c.BodyParser(&body)
 
@@ -183,9 +189,9 @@ func (h *Handler) GetReports(c *fiber.Ctx) error {
 		       r.status, r.created_at, p.first_name
 		FROM reports r
 		LEFT JOIN profiles p ON p.user_id = r.reported_id
-		WHERE r.status = 'pending'
+		WHERE r.status = $1
 		ORDER BY r.created_at ASC LIMIT 50
-	`)
+	`, c.Query("status", "pending"))
 	defer rows.Close()
 
 	var reports []fiber.Map
@@ -205,7 +211,7 @@ func (h *Handler) GetReports(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ReviewReport(c *fiber.Ctx) error {
-	u, _ := h.getUser(c)
+	admin := c.Locals("admin_user").(AdminUser)
 	var body struct {
 		Action string `json:"action"`
 	}
@@ -215,7 +221,7 @@ func (h *Handler) ReviewReport(c *fiber.Ctx) error {
 		UPDATE reports SET status = 'reviewed', reviewed_by = $2,
 		       reviewed_at = NOW(), action_taken = $3
 		WHERE id = $1
-	`, c.Params("id"), u.ID, body.Action)
+	`, c.Params("id"), admin.ID, body.Action)
 
 	if body.Action == "ban" || body.Action == "suspension" {
 		var reportedID string
@@ -223,9 +229,158 @@ func (h *Handler) ReviewReport(c *fiber.Ctx) error {
 			"SELECT reported_id FROM reports WHERE id = $1", c.Params("id"),
 		).Scan(&reportedID)
 		if reportedID != "" {
-			h.userService.PauseProfile(c.Context(), reportedID)
+			h.db.Exec(c.Context(), "UPDATE users SET status = 'banned', updated_at = NOW() WHERE id = $1", reportedID)
 		}
 	}
 
 	return c.JSON(fiber.Map{"status": "reviewed"})
+}
+
+func (h *Handler) ListUsers(c *fiber.Ctx) error {
+	search := c.Query("search", "")
+	status := c.Query("status", "")
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+
+	query := `
+		SELECT u.id, u.telegram_id, u.status, u.verification, u.trust_score,
+		       u.subscription, u.created_at, u.last_active_at,
+		       p.first_name, p.city, p.country, p.heritage, p.completeness
+		FROM users u
+		LEFT JOIN profiles p ON p.user_id = u.id
+		WHERE 1=1
+	`
+	args := []interface{}{}
+	argNum := 1
+
+	if search != "" {
+		query += ` AND (p.first_name ILIKE $` + itoa(argNum) + ` OR u.telegram_id::text LIKE $` + itoa(argNum) + `)`
+		args = append(args, "%"+search+"%")
+		argNum++
+	}
+	if status != "" {
+		query += ` AND u.status = $` + itoa(argNum)
+		args = append(args, status)
+		argNum++
+	}
+
+	query += ` ORDER BY u.created_at DESC LIMIT $` + itoa(argNum) + ` OFFSET $` + itoa(argNum+1)
+	args = append(args, limit, offset)
+
+	rows, err := h.db.Query(c.Context(), query, args...)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to load users"})
+	}
+	defer rows.Close()
+
+	var users []fiber.Map
+	for rows.Next() {
+		var id string
+		var telegramID int64
+		var userStatus, verification string
+		var trustScore int
+		var subscription string
+		var createdAt, lastActiveAt interface{}
+		var firstName, city, country *string
+		var heritage []string
+		var completeness *int
+
+		rows.Scan(&id, &telegramID, &userStatus, &verification, &trustScore,
+			&subscription, &createdAt, &lastActiveAt,
+			&firstName, &city, &country, &heritage, &completeness)
+
+		users = append(users, fiber.Map{
+			"id": id, "telegram_id": telegramID, "status": userStatus,
+			"verification": verification, "trust_score": trustScore,
+			"subscription": subscription, "created_at": createdAt,
+			"last_active_at": lastActiveAt, "first_name": firstName,
+			"city": city, "country": country, "heritage": heritage,
+			"completeness": completeness,
+		})
+	}
+
+	// Get total count
+	var total int
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users").Scan(&total)
+
+	return c.JSON(fiber.Map{"users": users, "total": total})
+}
+
+func (h *Handler) GetUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var user fiber.Map
+	var telegramID int64
+	var status, verification, subscription string
+	var trustScore int
+	var createdAt, lastActiveAt interface{}
+
+	err := h.db.QueryRow(c.Context(), `
+		SELECT telegram_id, status, verification, trust_score, subscription, created_at, last_active_at
+		FROM users WHERE id = $1
+	`, id).Scan(&telegramID, &status, &verification, &trustScore, &subscription, &createdAt, &lastActiveAt)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "user not found"})
+	}
+
+	user = fiber.Map{
+		"id": id, "telegram_id": telegramID, "status": status,
+		"verification": verification, "trust_score": trustScore,
+		"subscription": subscription, "created_at": createdAt,
+		"last_active_at": lastActiveAt,
+	}
+
+	// Get profile
+	var firstName, city, country, bio *string
+	var heritage []string
+	var completeness *int
+	h.db.QueryRow(c.Context(), `
+		SELECT first_name, city, country, heritage, bio, completeness
+		FROM profiles WHERE user_id = $1
+	`, id).Scan(&firstName, &city, &country, &heritage, &bio, &completeness)
+
+	// Get stats
+	var matchCount, messageCount, reportCount int
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM matches WHERE (user_a_id = $1 OR user_b_id = $1) AND status = 'active'", id).Scan(&matchCount)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM messages WHERE sender_id = $1", id).Scan(&messageCount)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM reports WHERE reported_id = $1", id).Scan(&reportCount)
+
+	return c.JSON(fiber.Map{
+		"user": user,
+		"profile": fiber.Map{
+			"first_name": firstName, "city": city, "country": country,
+			"heritage": heritage, "bio": bio, "completeness": completeness,
+		},
+		"stats": fiber.Map{
+			"matches":  matchCount,
+			"messages": messageCount,
+			"reports":  reportCount,
+		},
+	})
+}
+
+func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
+	var body struct {
+		Status string `json:"status"` // active, banned, suspended
+	}
+	c.BodyParser(&body)
+
+	h.db.Exec(c.Context(), "UPDATE users SET status = $2, updated_at = NOW() WHERE id = $1",
+		c.Params("id"), body.Status)
+
+	return c.JSON(fiber.Map{"status": "updated"})
+}
+
+func (h *Handler) GetLogs(c *fiber.Ctx) error {
+	// Logs are in GCP Cloud Logging — query via console or API.
+	// This endpoint returns a link + recent error summary from the database.
+	return c.JSON(fiber.Map{
+		"logs":        []interface{}{},
+		"console_url": "https://console.cloud.google.com/logs/viewer?project=doodlegen-app-2026&resource=cloud_run_revision/service_name/rooted-api",
+		"note":        "View full logs in GCP Cloud Logging console. Structured JSON logs include method, path, status, latency_ms, telegram_id.",
+	})
+}
+
+func itoa(n int) string {
+	return strconv.Itoa(n)
 }

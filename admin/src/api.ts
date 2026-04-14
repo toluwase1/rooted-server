@@ -1,12 +1,20 @@
-const API_BASE = '/admin'
+const API_BASE = (import.meta.env.VITE_API_URL || '') + '/admin'
+const AUTH_BASE = (import.meta.env.VITE_API_URL || '') + '/admin/auth'
 
-// Admin uses Telegram init data for auth — passed from Mini App or stored locally
-function getInitData(): string {
-  return localStorage.getItem('admin_init_data') || ''
+function getToken(): string {
+  return localStorage.getItem('admin_token') || ''
 }
 
-export function setInitData(data: string) {
-  localStorage.setItem('admin_init_data', data)
+export function setToken(token: string) {
+  localStorage.setItem('admin_token', token)
+}
+
+export function clearToken() {
+  localStorage.removeItem('admin_token')
+}
+
+export function isLoggedIn(): boolean {
+  return !!getToken()
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -14,10 +22,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     method,
     headers: {
       'Content-Type': 'application/json',
-      'X-Telegram-Init-Data': getInitData(),
+      'Authorization': `Bearer ${getToken()}`,
     },
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) {
+    clearToken()
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }))
     throw new Error(err.error || `HTTP ${res.status}`)
@@ -26,13 +39,46 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const adminApi = {
+  // Auth
+  login: async (email: string, password: string) => {
+    const res = await fetch(`${AUTH_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Login failed' }))
+      throw new Error(err.error)
+    }
+    return res.json()
+  },
+  getMe: () => request<any>('GET', '/../admin/auth/me'),
+
+  // Stats
   getStats: () => request<any>('GET', '/stats'),
+
+  // Config
   getConfig: () => request<any>('GET', '/config'),
   updateConfig: (key: string, value: any, reason: string) =>
     request<any>('PUT', `/config/${key}`, { value, reason }),
   getConfigHistory: (key: string) => request<any>('GET', `/config/history/${key}`),
+
+  // Features
   getFeatures: () => request<any>('GET', '/features'),
   updateFeature: (key: string, data: any) => request<any>('PUT', `/features/${key}`, data),
-  getReports: () => request<any>('GET', '/reports'),
+
+  // Reports
+  getReports: (status = 'pending') => request<any>('GET', `/reports?status=${status}`),
   reviewReport: (id: string, action: string) => request<any>('PUT', `/reports/${id}`, { action }),
+
+  // Users
+  listUsers: (search = '', status = '', limit = 50, offset = 0) =>
+    request<any>('GET', `/users?search=${search}&status=${status}&limit=${limit}&offset=${offset}`),
+  getUser: (id: string) => request<any>('GET', `/users/${id}`),
+  updateUserStatus: (id: string, status: string) =>
+    request<any>('PUT', `/users/${id}/status`, { status }),
+
+  // Logs
+  getLogs: (limit = 100, offset = 0, errorsOnly = false) =>
+    request<any>('GET', `/logs?limit=${limit}&offset=${offset}&errors_only=${errorsOnly ? 'true' : ''}`),
 }

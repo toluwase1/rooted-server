@@ -103,7 +103,8 @@ func main() {
 	chatHandler := chat.NewHandler(chatService, userService)
 	paymentHandler := payment.NewHandler(paymentService, userService)
 	moderationHandler := moderation.NewHandler(db, dynConfig, userService)
-	adminHandler := admin.NewHandler(db, dynConfig, userService)
+	adminHandler := admin.NewHandler(db, dynConfig)
+	adminAuthHandler := admin.NewAuthHandler(db, cfg.JWTSecret)
 	webhookHandler := telegram.NewWebhookHandler(bot, userService, chatService, cfg.TelegramWebAppURL)
 
 	bot.SetBotCommands(ctx)
@@ -120,6 +121,7 @@ func main() {
 	app.Use(logger.New(logger.Config{
 		Format: "${time} ${status} ${method} ${path} ${latency}\n",
 	}))
+	app.Use(middleware.RequestLogger())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Telegram-Init-Data",
@@ -140,10 +142,11 @@ func main() {
 	paymentHandler.RegisterRoutes(api)
 	moderationHandler.RegisterRoutes(api)
 
-	adminGroup := app.Group("/admin",
-		middleware.TelegramAuth(cfg.TelegramBotToken, rdb),
-		middleware.AdminOnly(cfg.AdminTelegramIDs),
-	)
+	// Admin auth (login — no JWT required)
+	adminAuthHandler.RegisterRoutes(app)
+
+	// Admin routes (JWT required)
+	adminGroup := app.Group("/admin", adminAuthHandler.AdminJWTAuth())
 	adminHandler.RegisterRoutes(adminGroup)
 
 	// --- Graceful Shutdown ---
