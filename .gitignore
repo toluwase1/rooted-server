@@ -8,6 +8,7 @@ bin/
 *.out
 vendor/
 .DS_Store
+.wrangler/
 node_modules/
 miniapp/dist/
 admin/dist/
