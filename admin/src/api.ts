@@ -79,6 +79,8 @@ export const adminApi = {
     request<any>('PUT', `/users/${id}/status`, { status }),
 
   // Logs
-  getLogs: (limit = 100, offset = 0, errorsOnly = false) =>
-    request<any>('GET', `/logs?limit=${limit}&offset=${offset}&errors_only=${errorsOnly ? 'true' : ''}`),
+  getLogs: (limit = 100, range_ = '1h', severity = '', search = '') =>
+    request<any>('GET', `/logs?limit=${limit}&range=${range_}&severity=${severity}&search=${search}`),
+  getLogStats: (range_ = '24h') =>
+    request<any>('GET', `/logs/stats?range=${range_}`),
 }

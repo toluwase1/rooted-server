@@ -20,6 +20,7 @@ import (
 
 	"github.com/rooted-dating/rooted-server/internal/admin"
 	"github.com/rooted-dating/rooted-server/internal/chat"
+	"github.com/rooted-dating/rooted-server/internal/logging"
 	"github.com/rooted-dating/rooted-server/internal/matching"
 	"github.com/rooted-dating/rooted-server/internal/media"
 	"github.com/rooted-dating/rooted-server/internal/moderation"
@@ -102,8 +103,15 @@ func main() {
 	matchingHandler := matching.NewHandler(matchingService, userService, chatService, notifService)
 	chatHandler := chat.NewHandler(chatService, userService)
 	paymentHandler := payment.NewHandler(paymentService, userService)
+	// Cloud Logging client (for admin log viewer)
+	var logClient *logging.Client
+	logClient, err = logging.NewClient("doodlegen-app-2026", "rooted-api")
+	if err != nil {
+		log.Printf("Warning: Cloud Logging not available: %v", err)
+	}
+
 	moderationHandler := moderation.NewHandler(db, dynConfig, userService)
-	adminHandler := admin.NewHandler(db, dynConfig)
+	adminHandler := admin.NewHandler(db, dynConfig, logClient)
 	adminAuthHandler := admin.NewAuthHandler(db, cfg.JWTSecret)
 	webhookHandler := telegram.NewWebhookHandler(bot, userService, chatService, cfg.TelegramWebAppURL)
 

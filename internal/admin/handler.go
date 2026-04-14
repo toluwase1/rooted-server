@@ -3,19 +3,22 @@ package admin
 import (
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rooted-dating/rooted-server/internal/logging"
 	"github.com/rooted-dating/rooted-server/internal/shared/config"
 )
 
 type Handler struct {
 	db        *pgxpool.Pool
 	dynConfig *config.DynamicConfig
+	logClient *logging.Client
 }
 
-func NewHandler(db *pgxpool.Pool, dynConfig *config.DynamicConfig) *Handler {
-	return &Handler{db: db, dynConfig: dynConfig}
+func NewHandler(db *pgxpool.Pool, dynConfig *config.DynamicConfig, logClient *logging.Client) *Handler {
+	return &Handler{db: db, dynConfig: dynConfig, logClient: logClient}
 }
 
 func (h *Handler) RegisterRoutes(admin fiber.Router) {
@@ -31,6 +34,7 @@ func (h *Handler) RegisterRoutes(admin fiber.Router) {
 	admin.Get("/users/:id", h.GetUser)
 	admin.Put("/users/:id/status", h.UpdateUserStatus)
 	admin.Get("/logs", h.GetLogs)
+	admin.Get("/logs/stats", h.GetLogStats)
 }
 
 func (h *Handler) GetStats(c *fiber.Ctx) error {
@@ -372,13 +376,71 @@ func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetLogs(c *fiber.Ctx) error {
-	// Logs are in GCP Cloud Logging — query via console or API.
-	// This endpoint returns a link + recent error summary from the database.
-	return c.JSON(fiber.Map{
-		"logs":        []interface{}{},
-		"console_url": "https://console.cloud.google.com/logs/viewer?project=doodlegen-app-2026&resource=cloud_run_revision/service_name/rooted-api",
-		"note":        "View full logs in GCP Cloud Logging console. Structured JSON logs include method, path, status, latency_ms, telegram_id.",
+	if h.logClient == nil {
+		return c.JSON(fiber.Map{
+			"entries":     []interface{}{},
+			"console_url": "https://console.cloud.google.com/logs/viewer?project=doodlegen-app-2026&resource=cloud_run_revision/service_name/rooted-api",
+			"note":        "Cloud Logging client not initialized. View logs in GCP console.",
+		})
+	}
+
+	// Parse time range
+	timeRange := c.Query("range", "1h")
+	var startTime time.Time
+	switch timeRange {
+	case "1h":
+		startTime = time.Now().Add(-1 * time.Hour)
+	case "6h":
+		startTime = time.Now().Add(-6 * time.Hour)
+	case "24h":
+		startTime = time.Now().Add(-24 * time.Hour)
+	case "7d":
+		startTime = time.Now().Add(-7 * 24 * time.Hour)
+	default:
+		startTime = time.Now().Add(-1 * time.Hour)
+	}
+
+	result, err := h.logClient.QueryLogs(c.Context(), logging.QueryParams{
+		Severity:  c.Query("severity", ""),
+		Search:    c.Query("search", ""),
+		StartTime: startTime,
+		EndTime:   time.Now(),
+		PageSize:  c.QueryInt("limit", 100),
+		PageToken: c.Query("page_token", ""),
 	})
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to query logs: " + err.Error()})
+	}
+
+	return c.JSON(result)
+}
+
+func (h *Handler) GetLogStats(c *fiber.Ctx) error {
+	if h.logClient == nil {
+		return c.JSON(fiber.Map{"note": "Cloud Logging client not initialized"})
+	}
+
+	timeRange := c.Query("range", "24h")
+	var startTime time.Time
+	switch timeRange {
+	case "1h":
+		startTime = time.Now().Add(-1 * time.Hour)
+	case "6h":
+		startTime = time.Now().Add(-6 * time.Hour)
+	case "24h":
+		startTime = time.Now().Add(-24 * time.Hour)
+	case "7d":
+		startTime = time.Now().Add(-7 * 24 * time.Hour)
+	default:
+		startTime = time.Now().Add(-24 * time.Hour)
+	}
+
+	stats, err := h.logClient.GetStats(c.Context(), startTime, time.Now())
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to get log stats: " + err.Error()})
+	}
+
+	return c.JSON(stats)
 }
 
 func itoa(n int) string {
