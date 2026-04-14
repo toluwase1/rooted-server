@@ -129,13 +129,29 @@ func (c *Client) QueryLogs(ctx context.Context, params QueryParams) (*LogResult,
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := c.hc.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("cloud logging request: %w", err)
-	}
-	defer resp.Body.Close()
+	var resp *http.Response
+	var respBody []byte
 
-	respBody, _ := io.ReadAll(resp.Body)
+	// Retry once on 503 (transient unavailability)
+	for attempt := 0; attempt < 2; attempt++ {
+		reqCopy := req.Clone(req.Context())
+		reqCopy.Body = io.NopCloser(strings.NewReader(string(body)))
+
+		resp, err = c.hc.Do(reqCopy)
+		if err != nil {
+			return nil, fmt.Errorf("cloud logging request: %w", err)
+		}
+
+		respBody, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != 503 {
+			break
+		}
+		// Wait briefly before retry
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("cloud logging API error (%d): %s", resp.StatusCode, string(respBody))
 	}
@@ -194,17 +210,26 @@ func (c *Client) GetStats(ctx context.Context, startTime, endTime time.Time) (*L
 		startTime = endTime.Add(-24 * time.Hour)
 	}
 
+	// Use a shorter timeout for stats — better to return partial data than timeout
+	statsCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
 	allEntries := []ParsedEntry{}
 	pageToken := ""
 
-	for i := 0; i < 5; i++ {
-		result, err := c.QueryLogs(ctx, QueryParams{
+	// Fewer pages for stats (2 x 200 = 400 max) to keep it fast
+	for i := 0; i < 2; i++ {
+		result, err := c.QueryLogs(statsCtx, QueryParams{
 			StartTime: startTime,
 			EndTime:   endTime,
 			PageSize:  200,
 			PageToken: pageToken,
 		})
 		if err != nil {
+			// If we already have some entries, return partial stats instead of failing
+			if len(allEntries) > 0 {
+				break
+			}
 			return nil, err
 		}
 		allEntries = append(allEntries, result.Entries...)
