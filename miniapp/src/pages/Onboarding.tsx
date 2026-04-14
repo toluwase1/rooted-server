@@ -392,14 +392,9 @@ export default function Onboarding({ onComplete }: Props) {
 
   return (
     <div>
-      {/* Progress bar */}
-      <div style={{ display: 'flex', gap: '4px', padding: '12px 16px' }}>
+      <div className="progress-bar">
         {steps.map((_, i) => (
-          <div key={i} style={{
-            flex: 1, height: '3px', borderRadius: '2px',
-            background: i <= step ? 'var(--primary)' : 'var(--border)',
-            transition: 'background 0.3s',
-          }} />
+          <div key={i} className={`progress-segment ${i <= step ? 'active' : ''}`} />
         ))}
       </div>
 

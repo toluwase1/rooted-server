@@ -14,19 +14,64 @@
   --radius-sm: 10px;
 }
 
+* { -webkit-tap-highlight-color: transparent; }
+
 body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
 
+/* ==========================================
+   ANIMATIONS
+   ========================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ==========================================
+   LAYOUT
+   ========================================== */
+
 .container {
   max-width: 420px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 20px 16px;
 }
 
-/* Buttons */
+.page {
+  padding-bottom: 90px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.page-header {
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  letter-spacing: -0.3px;
+}
+
+/* ==========================================
+   BUTTONS
+   ========================================== */
+
 .btn {
   display: flex;
   align-items: center;
@@ -38,22 +83,32 @@ body {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: transform 0.15s, opacity 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
 }
-.btn:active { opacity: 0.7; }
+.btn:active { transform: scale(0.97); opacity: 0.85; }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
 .btn-primary { background: var(--button-bg); color: var(--button-text); }
 .btn-secondary { background: var(--card-bg); color: var(--text); }
 .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
 
-/* Cards */
+/* ==========================================
+   CARDS
+   ========================================== */
+
 .card {
   background: var(--card-bg);
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
+  animation: fadeInScale 0.2s ease-out;
 }
 
-/* Profile card for swiping */
+/* ==========================================
+   SWIPE CARD
+   ========================================== */
+
 .swipe-card {
   position: relative;
   width: 100%;
@@ -61,46 +116,46 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--card-bg);
+  transition: transform 0.15s ease-out;
+  will-change: transform;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
 }
 .swipe-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity 0.3s;
 }
 .swipe-card-info {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 20px 16px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  padding: 24px 16px 20px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.75));
   color: white;
 }
-.swipe-card-info h2 { font-size: 24px; margin-bottom: 4px; }
-.swipe-card-info p { font-size: 14px; opacity: 0.9; }
-
-/* Badges */
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+.swipe-card-info h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 3px;
+  letter-spacing: -0.2px;
 }
-.badge-heritage { background: #E07A5F20; color: var(--primary); }
-.badge-verified { background: #81B29A20; color: var(--accent); }
-.badge-diaspora { background: #3D405B20; color: var(--secondary); }
+.swipe-card-info p { font-size: 14px; opacity: 0.85; }
 
-/* Swipe action buttons */
+/* ==========================================
+   SWIPE ACTIONS
+   ========================================== */
+
 .swipe-actions {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 24px;
   padding: 20px 0;
 }
 .swipe-btn {
-  width: 60px;
-  height: 60px;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   border: none;
   display: flex;
@@ -108,14 +163,34 @@ body {
   justify-content: center;
   font-size: 24px;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.swipe-btn:active { transform: scale(0.9); }
-.swipe-btn-pass { background: #FF6B6B20; color: #FF6B6B; }
-.swipe-btn-like { background: #81B29A20; color: #81B29A; }
-.swipe-btn-rose { background: #E07A5F20; color: var(--primary); }
+.swipe-btn:active { transform: scale(0.85); }
+.swipe-btn-pass { background: #FF6B6B15; color: #FF6B6B; }
+.swipe-btn-like { background: #81B29A15; color: #81B29A; }
+.swipe-btn-rose { background: #E07A5F15; color: var(--primary); }
 
-/* Navigation */
+/* ==========================================
+   BADGES
+   ========================================== */
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.badge-heritage { background: #E07A5F15; color: var(--primary); }
+.badge-verified { background: #81B29A15; color: var(--accent); }
+.badge-diaspora { background: #3D405B15; color: var(--secondary); }
+
+/* ==========================================
+   NAVIGATION
+   ========================================== */
+
 .nav {
   position: fixed;
   bottom: 0;
@@ -123,25 +198,32 @@ body {
   right: 0;
   display: flex;
   justify-content: space-around;
-  padding: 10px 0 20px;
+  padding: 8px 0 calc(env(safe-area-inset-bottom, 8px) + 8px);
   background: var(--bg);
   border-top: 1px solid var(--border);
   z-index: 100;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-size: 10px;
   color: var(--text-secondary);
   text-decoration: none;
   cursor: pointer;
+  padding: 4px 12px;
+  transition: color 0.15s;
 }
 .nav-item.active { color: var(--primary); }
 .nav-icon { font-size: 22px; }
 
-/* Input fields */
+/* ==========================================
+   INPUTS
+   ========================================== */
+
 .input-group { margin-bottom: 16px; }
 .input-group label {
   display: block;
@@ -154,49 +236,96 @@ body {
 .input-group textarea,
 .input-group select {
   width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border);
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 16px;
   background: var(--bg);
   color: var(--text);
+  transition: border-color 0.2s;
+}
+.input-group input:focus,
+.input-group textarea:focus,
+.input-group select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 .input-group textarea { resize: vertical; min-height: 80px; }
 
-/* Prompt selection */
+/* ==========================================
+   SELECTIONS (Prompts, Options)
+   ========================================== */
+
 .prompt-option {
-  padding: 12px;
-  border: 1px solid var(--border);
+  padding: 14px;
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   margin-bottom: 8px;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s, transform 0.1s;
+  font-size: 15px;
 }
+.prompt-option:active { transform: scale(0.98); }
 .prompt-option.selected {
   border-color: var(--accent);
-  background: #81B29A15;
+  background: #81B29A10;
 }
 
-/* Match list */
+.tag-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tag:active { transform: scale(0.95); }
+.tag.selected {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* ==========================================
+   MATCH LIST
+   ========================================== */
+
 .match-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background 0.15s;
 }
+.match-item:active { background: var(--card-bg); }
 .match-avatar {
   width: 56px;
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
-.match-info { flex: 1; }
+.match-info { flex: 1; min-width: 0; }
 .match-name { font-weight: 600; font-size: 16px; }
-.match-preview { font-size: 13px; color: var(--text-secondary); }
+.match-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-/* Compatibility score */
+/* ==========================================
+   COMPATIBILITY SCORE
+   ========================================== */
+
 .compat-score {
   display: flex;
   align-items: center;
@@ -206,15 +335,10 @@ body {
   color: var(--accent);
 }
 
-/* Page transitions */
-.page { padding-bottom: 80px; }
-.page-header {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 20px;
-}
+/* ==========================================
+   PHOTO GRID
+   ========================================== */
 
-/* Photo grid (onboarding) */
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -229,40 +353,120 @@ body {
   justify-content: center;
   cursor: pointer;
   overflow: hidden;
+  transition: border-color 0.2s;
 }
+.photo-slot:active { border-color: var(--accent); }
 .photo-slot img { width: 100%; height: 100%; object-fit: cover; }
-.photo-slot-add { font-size: 32px; color: var(--text-secondary); }
+.photo-slot-add { font-size: 28px; color: var(--text-secondary); }
 
-/* Heritage/tag selector */
-.tag-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.tag {
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.tag.selected { background: var(--accent); color: white; border-color: var(--accent); }
+/* ==========================================
+   LOADING & EMPTY STATES
+   ========================================== */
 
-/* Loading */
 .loading {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 60vh;
-  font-size: 16px;
+  gap: 12px;
   color: var(--text-secondary);
+  animation: pulse 1.5s infinite;
 }
 
-/* Empty state */
+.skeleton {
+  background: linear-gradient(90deg, var(--card-bg) 25%, var(--border) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
 .empty-state {
   text-align: center;
-  padding: 40px 20px;
+  padding: 48px 24px;
   color: var(--text-secondary);
+  animation: fadeIn 0.3s ease-out;
 }
-.empty-state h3 { font-size: 20px; margin-bottom: 8px; color: var(--text); }
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.empty-state p {
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+/* ==========================================
+   MATCH POPUP (overlay)
+   ========================================== */
+
+.match-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+.match-overlay-card {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 36px 28px;
+  text-align: center;
+  max-width: 300px;
+  width: 100%;
+  animation: fadeInScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ==========================================
+   PROGRESS BAR (onboarding)
+   ========================================== */
+
+.progress-bar {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px;
+}
+.progress-segment {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.4s ease;
+}
+.progress-segment.active {
+  background: var(--accent);
+}
+
+/* ==========================================
+   SECTION LABELS
+   ========================================== */
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 8px;
+}
+
+/* ==========================================
+   SAFE AREA (iPhone notch)
+   ========================================== */
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .page { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+}

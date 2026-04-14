@@ -71,6 +71,7 @@ export default function Explore({ user }: Props) {
     return (
       <div className="container page">
         <div className="empty-state">
+          <span className="empty-state-icon">◈</span>
           <h3>Daily swipe limit reached</h3>
           <p>Upgrade to Rooted Plus for unlimited swipes.</p>
           <button className="btn btn-primary" style={{ marginTop: '16px' }}
@@ -97,6 +98,7 @@ export default function Explore({ user }: Props) {
 
       {!candidate && (
         <div className="empty-state">
+          <span className="empty-state-icon">◈</span>
           <h3>No more profiles</h3>
           <p>Check back later for new people.</p>
         </div>
@@ -107,21 +109,11 @@ export default function Explore({ user }: Props) {
       )}
 
       {matchPopup && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px',
-        }}
-          onClick={() => setMatchPopup(null)}
-        >
-          <div style={{
-            background: 'var(--bg)', borderRadius: 'var(--radius)',
-            padding: '32px', textAlign: 'center', maxWidth: '320px',
-          }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>♡</div>
+        <div className="match-overlay" onClick={() => setMatchPopup(null)}>
+          <div className="match-overlay-card" onClick={(e) => e.stopPropagation()}>
+            <span className="empty-state-icon">♡</span>
             <h2>It's a match!</h2>
-            <p style={{ color: 'var(--text-secondary)', margin: '8px 0 20px' }}>
+            <p style={{ color: 'var(--text-secondary)', margin: '8px 0 20px', fontSize: '14px' }}>
               You and {matchPopup.first_name} liked each other!
             </p>
             <button className="btn btn-primary" onClick={() => setMatchPopup(null)}>

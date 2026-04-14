@@ -28,6 +28,7 @@ export default function Matches({ user }: Props) {
 
       {matches.length === 0 && (
         <div className="empty-state">
+          <span className="empty-state-icon">♡</span>
           <h3>No matches yet</h3>
           <p>Keep swiping in your Circle or Explore to find your match.</p>
         </div>

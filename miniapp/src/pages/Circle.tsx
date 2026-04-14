@@ -55,6 +55,7 @@ export default function Circle({ user }: Props) {
 
       {!candidate && candidates.length === 0 && (
         <div className="empty-state">
+          <span className="empty-state-icon">◎</span>
           <h3>No matches yet</h3>
           <p>Your daily circle will be delivered at 7 PM. Check back later!</p>
         </div>
@@ -62,6 +63,7 @@ export default function Circle({ user }: Props) {
 
       {!candidate && candidates.length > 0 && (
         <div className="empty-state">
+          <span className="empty-state-icon">✓</span>
           <h3>You've seen everyone</h3>
           <p>Come back tomorrow for new profiles, or try Explore for more.</p>
         </div>
@@ -77,25 +79,12 @@ export default function Circle({ user }: Props) {
         </p>
       )}
 
-      {/* Match popup */}
       {matchPopup && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          padding: '20px',
-        }}
-          onClick={() => setMatchPopup(null)}
-        >
-          <div style={{
-            background: 'var(--bg)', borderRadius: 'var(--radius)',
-            padding: '32px', textAlign: 'center', maxWidth: '320px',
-          }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>♡</div>
+        <div className="match-overlay" onClick={() => setMatchPopup(null)}>
+          <div className="match-overlay-card" onClick={(e) => e.stopPropagation()}>
+            <span className="empty-state-icon">♡</span>
             <h2 style={{ marginBottom: '8px' }}>It's a match!</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '14px' }}>
               You and {matchPopup.first_name} liked each other. Start chatting!
             </p>
             <button className="btn btn-primary" onClick={() => setMatchPopup(null)}>
