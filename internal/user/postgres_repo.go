@@ -123,7 +123,7 @@ func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req Cre
 			bio, cultural_prompts, personality_prompts, completeness
 		) VALUES (
 			$1, $2, $3, $4, $5,
-			$6, $7, $8, $9, ST_MakePoint($9::float8, $8::float8)::geography,
+			$6, $7, $8, $9, ST_MakePoint($19::float8, $20::float8)::geography,
 			$10, $11, $12, $13, $14,
 			$15, $16, $17, $18
 		)
@@ -137,6 +137,7 @@ func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req Cre
 		req.City, req.Country, req.Latitude, req.Longitude,
 		req.Heritage, req.DiasporaTag, req.Intention, req.Faith, req.FaithImportance,
 		req.Bio, culturalJSON, personalityJSON, completeness,
+		req.Longitude, req.Latitude, // $19, $20 — separate params for ST_MakePoint
 	).Scan(
 		&p.UserID, &p.FirstName, &p.DateOfBirth, &p.Gender, &p.GenderPref,
 		&p.City, &p.Country, &p.Latitude, &p.Longitude,
