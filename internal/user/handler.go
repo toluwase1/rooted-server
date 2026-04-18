@@ -1,7 +1,9 @@
 package user
 
 import (
+	"context"
 	"log"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -61,6 +63,7 @@ func (h *Handler) GetMe(c *fiber.Ctx) error {
 	var profile *Profile
 	if !isNew {
 		profile, _ = h.service.GetProfile(c.Context(), u.ID)
+		h.enrichPhotoURLs(c.Context(), profile)
 	}
 	return c.JSON(fiber.Map{"user": u, "profile": profile, "is_new": isNew})
 }
@@ -78,6 +81,7 @@ func (h *Handler) GetProfileByID(c *fiber.Ctx) error {
 	if profile == nil {
 		return c.Status(404).JSON(fiber.Map{"error": "profile not found"})
 	}
+	h.enrichPhotoURLs(c.Context(), profile)
 	return c.JSON(profile)
 }
 
@@ -184,6 +188,24 @@ func (h *Handler) UnblockUser(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "unblocked"})
 }
 
+// enrichPhotoURLs replaces R2 keys with presigned read URLs for each photo.
+func (h *Handler) enrichPhotoURLs(ctx context.Context, profile *Profile) {
+	if h.mediaService == nil || profile == nil {
+		return
+	}
+	for i := range profile.Photos {
+		key := profile.Photos[i].URLMedium
+		if key != "" && !strings.HasPrefix(key, "http") {
+			url, err := h.mediaService.GetPresignedReadURL(ctx, key)
+			if err == nil {
+				profile.Photos[i].URLThumbnail = url
+				profile.Photos[i].URLMedium = url
+				profile.Photos[i].URLLarge = url
+			}
+		}
+	}
+}
+
 func (h *Handler) VerifyPhoto(c *fiber.Ctx) error {
 	u, err := h.getUser(c)
 	if err != nil {
@@ -249,9 +271,9 @@ func (h *Handler) UploadPhoto(c *fiber.Ctx) error {
 	photo := Photo{
 		ID:           uuid.New().String(),
 		UserID:       u.ID,
-		URLThumbnail: result.URLThumbnail,
-		URLMedium:    result.URLMedium,
-		URLLarge:     result.URLLarge,
+		URLThumbnail: result.Key, // Store R2 key, not presigned URL
+		URLMedium:    result.Key,
+		URLLarge:     result.Key,
 		Position:     position,
 		IsPrimary:    position == 0,
 	}
