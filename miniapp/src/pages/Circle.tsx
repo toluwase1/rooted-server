@@ -56,13 +56,13 @@ export default function Circle({ user, profile }: Props) {
     <div className="container page">
       <h1 className="page-header">Your Circle</h1>
 
-      {profile && profile.completeness < 100 && (
+      {profile && profile.completeness < 90 && (
         <div className="card" onClick={() => navigate('/complete-profile')}
           style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <div style={{ fontWeight: '600', fontSize: '14px' }}>Complete your profile</div>
+            <div style={{ fontWeight: '600', fontSize: '14px' }}>Boost your profile</div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              {profile.completeness}% done — add prompts to get 3x more likes
+              {profile.completeness}% done — add prompts & photos for more likes
             </div>
           </div>
           <span style={{ color: 'var(--primary)', fontSize: '20px' }}>→</span>

@@ -38,20 +38,11 @@ export default function Settings({ user, profile }: Props) {
     premium: 'Rooted Premium',
   }
 
+  const photoCount = profile?.photos?.length || 0
+
   return (
     <div className="container page">
       <h1 className="page-header">Settings</h1>
-
-      {/* Complete profile banner */}
-      {profile && profile.completeness < 100 && (
-        <div className="card" onClick={() => navigate('/complete-profile')}
-          style={{ cursor: 'pointer', background: '#81B29A15', borderLeft: '3px solid var(--accent)' }}>
-          <div style={{ fontWeight: '600', fontSize: '14px' }}>Boost your profile</div>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            {profile.completeness}% complete — add prompts and photos to get more matches
-          </div>
-        </div>
-      )}
 
       {/* Profile preview */}
       {profile && (
@@ -62,28 +53,72 @@ export default function Settings({ user, profile }: Props) {
               background: 'linear-gradient(135deg, #E07A5F, #81B29A)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'white', fontSize: '18px', fontWeight: 'bold',
+              overflow: 'hidden',
             }}>
-              {profile.first_name[0]}
+              {profile.photos?.[0] ? (
+                <img src={profile.photos[0].url_medium} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                profile.first_name[0]
+              )}
             </div>
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ fontWeight: '600' }}>{profile.first_name}</div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
                 View your profile
               </div>
             </div>
+            <span style={{ color: 'var(--text-secondary)' }}>→</span>
+          </div>
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="section-label" style={{ marginTop: '16px' }}>Profile</div>
+
+      <div className="card" onClick={() => navigate('/complete-profile')} style={{ cursor: 'pointer' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: '600', fontSize: '14px' }}>Edit prompts & photos</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              {photoCount}/6 photos · {(profile?.cultural_prompts?.length || 0)} cultural prompts
+            </div>
+          </div>
+          <span style={{ color: 'var(--text-secondary)' }}>→</span>
+        </div>
+      </div>
+
+      {/* Completeness */}
+      {profile && profile.completeness < 90 && (
+        <div className="card" style={{ background: '#81B29A10' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '600' }}>Profile strength</span>
+            <span style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600' }}>{profile.completeness}%</span>
+          </div>
+          <div style={{
+            width: '100%', height: '6px', borderRadius: '3px',
+            background: 'var(--border)', overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${profile.completeness}%`, height: '100%',
+              background: 'var(--accent)', borderRadius: '3px',
+            }} />
           </div>
         </div>
       )}
 
       {/* Subscription */}
+      <div className="section-label" style={{ marginTop: '16px' }}>Account</div>
+
       <div className="card">
-        <label style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-          Subscription
-        </label>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-          <span style={{ fontWeight: '600' }}>{subLabel[user?.subscription] || 'Free'}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: '600', fontSize: '14px' }}>Subscription</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              {subLabel[user?.subscription] || 'Free'}
+            </div>
+          </div>
           {user?.subscription === 'free' && (
-            <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: '14px' }}
+            <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: '13px' }}
               onClick={() => navigate('/premium')}>
               Upgrade
             </button>
@@ -91,63 +126,45 @@ export default function Settings({ user, profile }: Props) {
         </div>
       </div>
 
-      {/* Profile completeness */}
-      {profile && (
-        <div className="card">
-          <label style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-            Profile completeness
-          </label>
-          <div style={{ marginTop: '8px' }}>
-            <div style={{
-              width: '100%', height: '8px', borderRadius: '4px',
-              background: 'var(--border)', overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${profile.completeness}%`, height: '100%',
-                background: profile.completeness >= 80 ? 'var(--accent)' : 'var(--primary)',
-                borderRadius: '4px', transition: 'width 0.3s',
-              }} />
-            </div>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              {profile.completeness}% complete
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Verification */}
       <div className="card">
-        <label style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-          Verification
-        </label>
-        <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>
-            {user?.verification === 'photo_verified' ? '✓ Photo verified' : 'Not verified'}
-          </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: '600', fontSize: '14px' }}>Verification</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              {user?.verification === 'photo_verified' ? 'Photo verified' : 'Not verified'}
+            </div>
+          </div>
           {user?.verification !== 'photo_verified' && (
-            <button className="btn btn-outline" style={{ width: 'auto', padding: '8px 16px', fontSize: '14px' }}
+            <button className="btn btn-outline" style={{ width: 'auto', padding: '8px 16px', fontSize: '13px' }}
               onClick={() => navigate('/verify')}>
-              Verify now
+              Verify
             </button>
           )}
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ marginTop: '24px' }}>
-        <button className="btn btn-secondary" style={{ marginBottom: '8px' }}
-          onClick={user?.status === 'paused' ? handleResume : handlePause}>
-          {user?.status === 'paused' ? 'Resume Profile' : 'Pause Profile'}
-        </button>
+      {/* Profile controls */}
+      <div className="section-label" style={{ marginTop: '16px' }}>Controls</div>
 
-        <button className="btn" style={{
-          background: confirmDelete ? '#FF3B30' : 'transparent',
-          color: confirmDelete ? 'white' : '#FF3B30',
-          border: '1px solid #FF3B30',
-        }}
-          onClick={handleDelete}>
-          {confirmDelete ? 'Confirm deletion — this is permanent' : 'Delete Account'}
-        </button>
+      <div className="card" onClick={user?.status === 'paused' ? handleResume : handlePause}
+        style={{ cursor: 'pointer' }}>
+        <div style={{ fontWeight: '600', fontSize: '14px' }}>
+          {user?.status === 'paused' ? 'Resume Profile' : 'Pause Profile'}
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          {user?.status === 'paused' ? 'Make your profile visible again' : 'Hide from searches temporarily'}
+        </div>
+      </div>
+
+      <div className="card" onClick={handleDelete}
+        style={{ cursor: 'pointer', borderColor: confirmDelete ? '#FF3B30' : undefined }}>
+        <div style={{ fontWeight: '600', fontSize: '14px', color: '#FF3B30' }}>
+          {confirmDelete ? 'Tap again to confirm deletion' : 'Delete Account'}
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          {confirmDelete ? 'This is permanent and cannot be undone' : 'Permanently delete your account and data'}
+        </div>
       </div>
     </div>
   )

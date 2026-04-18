@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/rooted-dating/rooted-server/internal/shared/database"
@@ -152,7 +151,7 @@ func (s *Service) AddPhoto(ctx context.Context, photo Photo) error {
 	if err := s.repo.AddPhoto(ctx, photo); err != nil {
 		return err
 	}
-	s.invalidateProfileCache(ctx, photo.UserID)
+	s.RecalcAndSaveCompleteness(ctx, photo.UserID)
 	return nil
 }
 
@@ -160,7 +159,7 @@ func (s *Service) DeletePhoto(ctx context.Context, photoID, userID string) error
 	if err := s.repo.DeletePhoto(ctx, photoID, userID); err != nil {
 		return err
 	}
-	s.invalidateProfileCache(ctx, userID)
+	s.RecalcAndSaveCompleteness(ctx, userID)
 	return nil
 }
 
@@ -187,21 +186,33 @@ func (s *Service) invalidateProfileCache(ctx context.Context, userID string) {
 
 func (s *Service) recalcCompleteness(p *Profile) int {
 	score := 0
-	total := 12
+	total := 14
 
-	if p.FirstName != "" { score++ }
-	if p.DateOfBirth != "" { score++ }
-	if p.Gender != "" { score++ }
-	if p.City != "" { score++ }
-	if len(p.Heritage) > 0 { score++ }
-	if p.DiasporaTag != "" { score++ }
-	if p.Intention != "" { score++ }
-	if p.Faith != "" { score++ }
-	if len(p.CulturalPrompts) >= 2 { score++ }
-	if len(p.PersonalityPrompts) >= 1 { score++ }
-	if len(p.Photos) >= 1 { score++ }
-	if p.Bio != "" { score++ }
+	if p.FirstName != "" { score++ }        // 1
+	if p.DateOfBirth != "" { score++ }       // 2
+	if p.Gender != "" { score++ }            // 3
+	if p.City != "" { score++ }              // 4
+	if len(p.Heritage) > 0 { score++ }       // 5
+	if p.DiasporaTag != "" { score++ }       // 6
+	if p.Intention != "" { score++ }         // 7
+	if p.Faith != "" { score++ }             // 8
+	if len(p.CulturalPrompts) >= 2 { score++ } // 9
+	if len(p.PersonalityPrompts) >= 1 { score++ } // 10
+	if len(p.Photos) >= 1 { score++ }        // 11 — has at least 1 photo
+	if len(p.Photos) >= 4 { score++ }        // 12 — has 4+ photos (bonus)
+	if p.Bio != "" { score++ }               // 13
+	if p.AudioBioURL != "" { score++ }       // 14
 
-	_ = fmt.Sprintf("")
 	return (score * 100) / total
+}
+
+// RecalcAndSaveCompleteness recalculates and persists completeness for a user.
+func (s *Service) RecalcAndSaveCompleteness(ctx context.Context, userID string) {
+	profile, err := s.repo.GetProfile(ctx, userID)
+	if err != nil || profile == nil {
+		return
+	}
+	completeness := s.recalcCompleteness(profile)
+	s.repo.UpdateCompleteness(ctx, userID, completeness)
+	s.invalidateProfileCache(ctx, userID)
 }
