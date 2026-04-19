@@ -98,7 +98,7 @@ func (r *PostgresRepo) FindCandidates(ctx context.Context, userID string, filter
 			AND u.id != $1
 			AND p.gender = $2
 			AND (p.gender_pref = $3 OR p.gender_pref = 'everyone')
-			AND p.intention IN ($4, 'both')
+			AND (p.intention = $4 OR p.intention = 'both' OR $4 = 'both')
 			AND p.date_of_birth BETWEEN $5 AND $16
 			AND p.completeness >= $8
 			AND u.id NOT IN (SELECT seen_user_id FROM seen_profiles WHERE user_id = $1)
