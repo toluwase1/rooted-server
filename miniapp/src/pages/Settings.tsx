@@ -75,6 +75,18 @@ export default function Settings({ user, profile }: Props) {
       {/* Quick actions */}
       <div className="section-label" style={{ marginTop: '16px' }}>Profile</div>
 
+      <div className="card" onClick={() => navigate('/edit-profile')} style={{ cursor: 'pointer' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: '600', fontSize: '14px' }}>Edit profile info</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Name, city, heritage, faith, bio
+            </div>
+          </div>
+          <span style={{ color: 'var(--text-secondary)' }}>→</span>
+        </div>
+      </div>
+
       <div className="card" onClick={() => navigate('/complete-profile')} style={{ cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>

@@ -11,6 +11,7 @@ import ProfileView from './pages/ProfileView'
 import Settings from './pages/Settings'
 import Premium from './pages/Premium'
 import Verify from './pages/Verify'
+import EditProfile from './pages/EditProfile'
 
 export default function App() {
   const [user, setUser] = useState<any>(null)
@@ -55,7 +56,7 @@ export default function App() {
     return <div className="loading">Loading...</div>
   }
 
-  const hiddenNavPaths = ['/onboarding', '/complete-profile', '/verify']
+  const hiddenNavPaths = ['/onboarding', '/complete-profile', '/verify', '/edit-profile']
   const showNav = !hiddenNavPaths.some(p => location.pathname.startsWith(p))
 
   return (
@@ -72,6 +73,9 @@ export default function App() {
         <Route path="/settings" element={<Settings user={user} profile={profile} />} />
         <Route path="/premium" element={<Premium user={user} />} />
         <Route path="/verify" element={<Verify />} />
+        <Route path="/edit-profile" element={
+          <EditProfile profile={profile} onSaved={onProfileCompleted} />
+        } />
       </Routes>
       {showNav && <Nav />}
     </>

@@ -65,6 +65,13 @@ func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, erro
 		return nil, nil
 	}
 
+	// Recalculate completeness on every load (cheap, ensures accuracy)
+	newCompleteness := s.recalcCompleteness(profile)
+	if newCompleteness != profile.Completeness {
+		profile.Completeness = newCompleteness
+		s.repo.UpdateCompleteness(ctx, userID, newCompleteness)
+	}
+
 	// Cache for next time
 	data, _ := json.Marshal(profile)
 	s.redis.Set(ctx, cacheKey, data, profileCacheTTL)
