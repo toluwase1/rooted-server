@@ -1,5 +1,6 @@
 bin/
 .env
+.env.deploy
 *.exe
 *.dll
 *.so

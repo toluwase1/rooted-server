@@ -1,9 +1,10 @@
 name: Deploy API
 
 on:
-  push:
-    branches: [main]
-    paths:
+  workflow_dispatch:  # Manual trigger only until GitHub secrets are fully configured
+  # push:
+  #   branches: [main]
+  #   paths:
       - 'cmd/**'
       - 'internal/**'
       - 'migrations/**'
