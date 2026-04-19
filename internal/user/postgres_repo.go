@@ -299,8 +299,8 @@ func (r *PostgresRepo) UpdateCompleteness(ctx context.Context, userID string, co
 
 func (r *PostgresRepo) AddPhoto(ctx context.Context, photo Photo) error {
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO photos (id, user_id, url_thumbnail, url_medium, url_large, position, is_primary)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO photos (id, user_id, url_thumbnail, url_medium, url_large, position, is_primary, moderation_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'approved')
 	`, photo.ID, photo.UserID, photo.URLThumbnail, photo.URLMedium, photo.URLLarge, photo.Position, photo.IsPrimary)
 	return err
 }
