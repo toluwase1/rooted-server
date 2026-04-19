@@ -5,22 +5,26 @@ import { api } from '../api/client'
 interface Props {
   user: any
   profile: any
+  onUserUpdated?: () => void
 }
 
-export default function Settings({ user, profile }: Props) {
+export default function Settings({ user: initialUser, profile, onUserUpdated }: Props) {
   const navigate = useNavigate()
+  const [user, setUser] = useState(initialUser)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const handlePause = async () => {
     await api.pauseProfile()
+    setUser((prev: any) => ({ ...prev, status: 'paused' }))
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('warning')
-    alert('Profile paused. You won\'t appear in searches.')
+    onUserUpdated?.()
   }
 
   const handleResume = async () => {
     await api.resumeProfile()
+    setUser((prev: any) => ({ ...prev, status: 'active' }))
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
-    alert('Profile resumed!')
+    onUserUpdated?.()
   }
 
   const handleDelete = async () => {
