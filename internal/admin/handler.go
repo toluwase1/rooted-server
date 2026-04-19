@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"log"
 	"strconv"
 	"time"
 
@@ -434,7 +435,8 @@ func (h *Handler) GetLogs(c *fiber.Ctx) error {
 		PageToken: c.Query("page_token", ""),
 	})
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to query logs: " + err.Error()})
+		log.Printf("ERROR GetLogs: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to query logs"})
 	}
 
 	return c.JSON(result)
@@ -462,7 +464,8 @@ func (h *Handler) GetLogStats(c *fiber.Ctx) error {
 
 	stats, err := h.logClient.GetStats(c.Context(), startTime, time.Now())
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "failed to get log stats: " + err.Error()})
+		log.Printf("ERROR GetLogStats: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to get log stats"})
 	}
 
 	return c.JSON(stats)

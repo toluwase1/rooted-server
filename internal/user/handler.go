@@ -227,7 +227,8 @@ func (h *Handler) VerifyPhoto(c *fiber.Ctx) error {
 
 func (h *Handler) UploadPhoto(c *fiber.Ctx) error {
 	if h.mediaService == nil {
-		return c.Status(503).JSON(fiber.Map{"error": "photo uploads not configured — R2 storage not set up"})
+		log.Println("ERROR UploadPhoto: media service not initialized (R2 not configured)")
+		return c.Status(500).JSON(fiber.Map{"error": "Photo upload is temporarily unavailable. Please try again later."})
 	}
 
 	u, err := h.getUser(c)
@@ -288,7 +289,8 @@ func (h *Handler) UploadPhoto(c *fiber.Ctx) error {
 
 func (h *Handler) GetUploadURL(c *fiber.Ctx) error {
 	if h.mediaService == nil {
-		return c.Status(503).JSON(fiber.Map{"error": "photo uploads not configured"})
+		log.Println("ERROR GetUploadURL: media service not initialized (R2 not configured)")
+		return c.Status(500).JSON(fiber.Map{"error": "Photo upload is temporarily unavailable. Please try again later."})
 	}
 
 	u, err := h.getUser(c)

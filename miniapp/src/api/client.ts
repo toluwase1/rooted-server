@@ -17,11 +17,30 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
+    const err = await res.json().catch(() => ({ error: '' }))
+    throw new Error(friendlyError(res.status, err.error))
   }
 
   return res.json()
+}
+
+function friendlyError(status: number, serverMsg: string): string {
+  // 4xx — user's fault, show the backend message (these are already user-friendly)
+  if (status >= 400 && status < 500 && serverMsg) {
+    return serverMsg
+  }
+
+  // 5xx — server's fault, never show internals
+  if (status >= 500) {
+    return 'Something went wrong. Please try again.'
+  }
+
+  // Network errors
+  if (status === 0) {
+    return 'No internet connection. Please check your network.'
+  }
+
+  return 'Something went wrong. Please try again.'
 }
 
 export const api = {
@@ -45,8 +64,8 @@ export const api = {
       body: formData,
     })
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Upload failed' }))
-      throw new Error(err.error || `HTTP ${res.status}`)
+      const err = await res.json().catch(() => ({ error: '' }))
+      throw new Error(friendlyError(res.status, err.error))
     }
     return res.json()
   },
@@ -61,8 +80,8 @@ export const api = {
       body: formData,
     })
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Verification failed' }))
-      throw new Error(err.error || `HTTP ${res.status}`)
+      const err = await res.json().catch(() => ({ error: '' }))
+      throw new Error(friendlyError(res.status, err.error))
     }
     return res.json()
   },
