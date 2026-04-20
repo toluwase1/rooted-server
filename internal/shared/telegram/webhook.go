@@ -73,28 +73,29 @@ func (h *WebhookHandler) handleMessage(ctx context.Context, msg *BotMessage) {
 	// Register chat routing (link telegram chat_id to internal user)
 	h.chatService.RegisterChatRouting(ctx, chatID, u.ID)
 
-	// Auto-set active conversation if user has exactly one
-	convs, _ := h.chatService.GetUserConversations(ctx, u.ID)
-	if len(convs) == 1 {
-		h.chatService.SetActiveConversation(ctx, chatID, convs[0].ID)
-	}
-
 	// Handle commands
 	if msg.Text != "" && strings.HasPrefix(msg.Text, "/") {
 		h.handleCommand(ctx, chatID, u, msg.Text, isNew)
 		return
 	}
 
-	// Handle regular messages — relay to active conversation
+	// Handle regular messages — ensure active conversation is set before relaying
+	convs, _ := h.chatService.GetUserConversations(ctx, u.ID)
 	if len(convs) == 0 {
 		h.bot.SendMessage(ctx, chatID,
 			"You don't have any matches yet. Use /explore to browse profiles!")
 		return
 	}
-	if len(convs) > 1 {
-		// Check if active conversation is set
-		routing, _ := h.chatService.GetRecipientTelegramChatID(ctx, u.ID)
-		if routing == 0 {
+
+	// Check if active conversation is set by trying to get the routing
+	routing, _ := h.chatService.GetChatRouting(ctx, chatID)
+	hasActiveConv := routing != nil && routing.ActiveConversationID != ""
+
+	if !hasActiveConv {
+		if len(convs) == 1 {
+			h.chatService.SetActiveConversation(ctx, chatID, convs[0].ID)
+			// Fall through to relay
+		} else {
 			h.showConversationList(ctx, chatID, u.ID)
 			return
 		}

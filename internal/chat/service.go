@@ -95,6 +95,11 @@ func (s *Service) RelayMessage(ctx context.Context, senderTelegramChatID int64, 
 	return &msg, recipientID, nil
 }
 
+// GetChatRouting returns the routing record for a telegram chat ID.
+func (s *Service) GetChatRouting(ctx context.Context, telegramChatID int64) (*ChatRouting, error) {
+	return s.getChatRouting(ctx, telegramChatID)
+}
+
 // GetRecipientTelegramChatID returns the Telegram chat ID for a user.
 func (s *Service) GetRecipientTelegramChatID(ctx context.Context, userID string) (int64, error) {
 	routing, err := s.repo.GetChatRoutingByUser(ctx, userID)
