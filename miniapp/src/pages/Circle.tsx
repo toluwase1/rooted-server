@@ -86,7 +86,7 @@ export default function Circle({ user, profile }: Props) {
       )}
 
       {candidate && (
-        <SwipeCard candidate={candidate} onSwipe={handleSwipe} />
+        <SwipeCard candidate={candidate} onSwipe={handleSwipe} onViewProfile={(id) => navigate(`/profile/${id}`)} />
       )}
 
       {candidates.length > 0 && (

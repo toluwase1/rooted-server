@@ -6,20 +6,24 @@ import (
 	"strconv"
 	"time"
 
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rooted-dating/rooted-server/internal/logging"
+	"github.com/rooted-dating/rooted-server/internal/media"
 	"github.com/rooted-dating/rooted-server/internal/shared/config"
 )
 
 type Handler struct {
-	db        *pgxpool.Pool
-	dynConfig *config.DynamicConfig
-	logClient *logging.Client
+	db           *pgxpool.Pool
+	dynConfig    *config.DynamicConfig
+	logClient    *logging.Client
+	mediaService *media.Service
 }
 
-func NewHandler(db *pgxpool.Pool, dynConfig *config.DynamicConfig, logClient *logging.Client) *Handler {
-	return &Handler{db: db, dynConfig: dynConfig, logClient: logClient}
+func NewHandler(db *pgxpool.Pool, dynConfig *config.DynamicConfig, logClient *logging.Client, mediaService *media.Service) *Handler {
+	return &Handler{db: db, dynConfig: dynConfig, logClient: logClient, mediaService: mediaService}
 }
 
 func (h *Handler) RegisterRoutes(admin fiber.Router) {
@@ -366,6 +370,19 @@ func (h *Handler) GetUser(c *fiber.Ctx) error {
 	}
 	if photos == nil {
 		photos = []fiber.Map{}
+	}
+
+	// Enrich photo URLs with presigned URLs
+	if h.mediaService != nil {
+		for i, photo := range photos {
+			if key, ok := photo["url_medium"].(string); ok && key != "" && !strings.HasPrefix(key, "http") {
+				if url, err := h.mediaService.GetPresignedReadURL(c.Context(), key); err == nil {
+					photos[i]["url_thumbnail"] = url
+					photos[i]["url_medium"] = url
+					photos[i]["url_large"] = url
+				}
+			}
+		}
 	}
 
 	// Get stats

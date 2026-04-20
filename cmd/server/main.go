@@ -100,7 +100,7 @@ func main() {
 	// --- Handlers ---
 
 	userHandler := user.NewHandler(userService, mediaService)
-	matchingHandler := matching.NewHandler(matchingService, userService, chatService, notifService)
+	matchingHandler := matching.NewHandler(matchingService, userService, chatService, notifService, mediaService)
 	chatHandler := chat.NewHandler(chatService, userService)
 	paymentHandler := payment.NewHandler(paymentService, userService)
 	// Cloud Logging client (for admin log viewer)
@@ -111,7 +111,7 @@ func main() {
 	}
 
 	moderationHandler := moderation.NewHandler(db, dynConfig, userService)
-	adminHandler := admin.NewHandler(db, dynConfig, logClient)
+	adminHandler := admin.NewHandler(db, dynConfig, logClient, mediaService)
 	adminAuthHandler := admin.NewAuthHandler(db, cfg.JWTSecret)
 	webhookHandler := telegram.NewWebhookHandler(bot, userService, chatService, cfg.TelegramWebAppURL)
 

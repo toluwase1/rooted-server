@@ -18,9 +18,10 @@ interface Candidate {
 interface Props {
   candidate: Candidate
   onSwipe: (action: 'like' | 'pass', comment?: string) => void
+  onViewProfile?: (userId: string) => void
 }
 
-export default function SwipeCard({ candidate, onSwipe }: Props) {
+export default function SwipeCard({ candidate, onSwipe, onViewProfile }: Props) {
   const [showDetails, setShowDetails] = useState(false)
   const [dragX, setDragX] = useState(0)
   const startX = useRef(0)
@@ -58,6 +59,15 @@ export default function SwipeCard({ candidate, onSwipe }: Props) {
       explorer: 'Explorer',
     }
     return labels[tag] || tag
+  }
+
+  const intentionLabel = (intention: string) => {
+    const labels: Record<string, string> = {
+      dating: 'Dating',
+      friendship: 'Friendship',
+      both: 'Dating & Friendship',
+    }
+    return labels[intention] || intention
   }
 
   const haptic = (style: 'light' | 'medium' | 'heavy') => {
@@ -105,7 +115,18 @@ export default function SwipeCard({ candidate, onSwipe }: Props) {
           {showDetails && (
             <div style={{ marginTop: '12px', fontSize: '13px' }}>
               {candidate.faith && <p>Faith: {candidate.faith}</p>}
-              <p>Looking for: {candidate.intention}</p>
+              <p>Looking for: {intentionLabel(candidate.intention)}</p>
+              {onViewProfile && (
+                <button onClick={(e) => { e.stopPropagation(); onViewProfile(candidate.user_id) }}
+                  style={{
+                    marginTop: '8px', padding: '6px 14px', borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.2)', color: 'white',
+                    border: '1px solid rgba(255,255,255,0.3)', fontSize: '12px',
+                    cursor: 'pointer',
+                  }}>
+                  View full profile
+                </button>
+              )}
             </div>
           )}
         </div>

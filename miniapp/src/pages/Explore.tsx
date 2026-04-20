@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import SwipeCard from '../components/SwipeCard'
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function Explore({ user }: Props) {
+  const navigate = useNavigate()
   const [candidates, setCandidates] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -105,7 +107,7 @@ export default function Explore({ user }: Props) {
       )}
 
       {candidate && (
-        <SwipeCard candidate={candidate} onSwipe={handleSwipe} />
+        <SwipeCard candidate={candidate} onSwipe={handleSwipe} onViewProfile={(id) => navigate(`/profile/${id}`)} />
       )}
 
       {matchPopup && (

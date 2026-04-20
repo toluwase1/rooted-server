@@ -1,11 +1,14 @@
 package matching
 
 import (
+	"context"
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rooted-dating/rooted-server/internal/chat"
+	"github.com/rooted-dating/rooted-server/internal/media"
 	"github.com/rooted-dating/rooted-server/internal/notification"
 	"github.com/rooted-dating/rooted-server/internal/shared/middleware"
 	"github.com/rooted-dating/rooted-server/internal/user"
@@ -16,10 +19,27 @@ type Handler struct {
 	userService  *user.Service
 	chatService  *chat.Service
 	notifService *notification.Service
+	mediaService *media.Service
 }
 
-func NewHandler(s *Service, us *user.Service, cs *chat.Service, ns *notification.Service) *Handler {
-	return &Handler{service: s, userService: us, chatService: cs, notifService: ns}
+func NewHandler(s *Service, us *user.Service, cs *chat.Service, ns *notification.Service, ms *media.Service) *Handler {
+	return &Handler{service: s, userService: us, chatService: cs, notifService: ns, mediaService: ms}
+}
+
+// enrichCandidatePhotos converts R2 keys to presigned URLs for candidate photos.
+func (h *Handler) enrichCandidatePhotos(ctx context.Context, candidates []ScoredCandidate) {
+	if h.mediaService == nil {
+		return
+	}
+	for i := range candidates {
+		key := candidates[i].PrimaryPhoto
+		if key != "" && !strings.HasPrefix(key, "http") {
+			url, err := h.mediaService.GetPresignedReadURL(ctx, key)
+			if err == nil {
+				candidates[i].PrimaryPhoto = url
+			}
+		}
+	}
 }
 
 func (h *Handler) RegisterRoutes(api fiber.Router) {
@@ -67,6 +87,7 @@ func (h *Handler) GetCircle(c *fiber.Ctx) error {
 	if candidates == nil {
 		candidates = []ScoredCandidate{}
 	}
+	h.enrichCandidatePhotos(c.Context(), candidates)
 	return c.JSON(fiber.Map{"candidates": candidates, "count": len(candidates)})
 }
 
@@ -103,6 +124,7 @@ func (h *Handler) GetExplore(c *fiber.Ctx) error {
 	if candidates == nil {
 		candidates = []ScoredCandidate{}
 	}
+	h.enrichCandidatePhotos(c.Context(), candidates)
 	return c.JSON(fiber.Map{
 		"candidates":       candidates,
 		"count":            len(candidates),
