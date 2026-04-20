@@ -1,40 +1,83 @@
-.PHONY: dev db migrate run build test clean
+.PHONY: dev db migrate run build test test-matching test-user lint check deploy clean
 
-# Start local databases (PostgreSQL + Redis)
+# ==========================================
+# LOCAL DEV
+# ==========================================
+
 db:
 	docker compose up -d
 
-# Stop local databases
 db-stop:
 	docker compose down
 
-# Run database migrations
 migrate:
 	psql "postgres://postgres:postgres@localhost:5432/rooted?sslmode=disable" -f migrations/001_initial.up.sql
+	psql "postgres://postgres:postgres@localhost:5432/rooted?sslmode=disable" -f migrations/002_admin_auth.up.sql
 
-# Rollback migrations
-migrate-down:
-	psql "postgres://postgres:postgres@localhost:5432/rooted?sslmode=disable" -f migrations/001_initial.down.sql
-
-# Run the server in development
 run:
 	go run ./cmd/server
 
-# Build the binary
-build:
-	go build -o bin/rooted-server ./cmd/server
-
-# Run tests
-test:
-	go test ./... -v
-
-# Clean build artifacts
-clean:
-	rm -rf bin/
-
-# Full local dev setup: start DBs, run migrations, start server
 dev: db
-	@echo "Waiting for databases to start..."
+	@echo "Waiting for databases..."
 	@sleep 3
 	@make migrate
 	@make run
+
+# ==========================================
+# BUILD & TEST
+# ==========================================
+
+build:
+	go build -o bin/rooted-server ./cmd/server
+
+test:
+	go test ./internal/... -timeout 180s -count=1
+
+test-v:
+	go test ./internal/... -v -timeout 180s -count=1
+
+test-matching:
+	go test ./internal/matching/ -v -timeout 120s -count=1
+
+test-user:
+	go test ./internal/user/ -v -timeout 120s -count=1
+
+lint:
+	go vet ./...
+
+# Build + lint + test — run before every push
+check: lint build test
+	@echo "✅ All checks passed"
+
+# ==========================================
+# FRONTEND
+# ==========================================
+
+build-miniapp:
+	cd miniapp && npx tsc --noEmit && VITE_API_URL=https://rooted-api-643943133167.us-central1.run.app npx vite build
+
+build-admin:
+	cd admin && npx tsc --noEmit && VITE_API_URL=https://rooted-api-643943133167.us-central1.run.app npx vite build
+
+# ==========================================
+# DEPLOY
+# ==========================================
+
+deploy-api:
+	source .env.deploy && ./scripts/deploy-api.sh
+
+deploy-miniapp: build-miniapp
+	npx wrangler pages deploy miniapp/dist --project-name=rooted-miniapp --commit-dirty=true
+
+deploy-admin: build-admin
+	npx wrangler pages deploy admin/dist --project-name=rooted-admin --commit-dirty=true
+
+deploy-all: check deploy-api deploy-miniapp deploy-admin
+	@echo "✅ All deployed"
+
+# ==========================================
+# CLEANUP
+# ==========================================
+
+clean:
+	rm -rf bin/ miniapp/dist/ admin/dist/
