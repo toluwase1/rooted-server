@@ -26,7 +26,7 @@ export default function ProfileView({ currentUserId }: Props) {
   }, [id])
 
   if (loading) return <div className="loading">Loading profile...</div>
-  if (!profile) return <div className="loading">Profile not found</div>
+  if (!profile || !profile.first_name) return <div className="loading">Profile not found</div>
 
   const isOwnProfile = profile.user_id === currentUserId
 
@@ -74,7 +74,7 @@ export default function ProfileView({ currentUserId }: Props) {
 
       {/* Badges */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        {profile.heritage?.map((h: string) => (
+        {(profile.heritage || []).map((h: string) => (
           <span key={h} className="badge badge-heritage">{h}</span>
         ))}
         <span className="badge badge-diaspora">
@@ -109,7 +109,7 @@ export default function ProfileView({ currentUserId }: Props) {
       )}
 
       {/* Cultural prompts */}
-      {profile.cultural_prompts?.map((p: any, i: number) => (
+      {(profile.cultural_prompts || []).map((p: any, i: number) => (
         <div key={i} className="card">
           <label style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
             {p.prompt}
@@ -119,7 +119,7 @@ export default function ProfileView({ currentUserId }: Props) {
       ))}
 
       {/* Personality prompts */}
-      {profile.personality_prompts?.map((p: any, i: number) => (
+      {(profile.personality_prompts || []).map((p: any, i: number) => (
         <div key={i} className="card">
           <label style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
             {p.prompt}
@@ -129,9 +129,9 @@ export default function ProfileView({ currentUserId }: Props) {
       ))}
 
       {/* Additional photos */}
-      {profile.photos?.length > 1 && (
+      {(profile.photos || []).length > 1 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
-          {profile.photos.slice(1).map((photo: any) => (
+          {(profile.photos || []).slice(1).map((photo: any) => (
             <div key={photo.id} style={{
               aspectRatio: '1', borderRadius: 'var(--radius-sm)', overflow: 'hidden',
             }}>
