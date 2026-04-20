@@ -38,8 +38,7 @@ export default function Matches({ user }: Props) {
         if (!profile) return null
 
         return (
-          <div key={match.id} className="match-item card"
-            onClick={() => navigate(`/profile/${profile.user_id}`)}>
+          <div key={match.id} className="match-item card">
             <div className="match-avatar" style={{
               width: '56px', height: '56px', borderRadius: '50%', overflow: 'hidden',
               background: 'linear-gradient(135deg, #E07A5F, #81B29A)',
@@ -70,8 +69,19 @@ export default function Matches({ user }: Props) {
               )}
             </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              Chat in bot →
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', fontSize: '12px' }}
+                onClick={(e) => { e.stopPropagation(); navigate(`/profile/${profile.user_id}`) }}>
+                Profile
+              </button>
+              <button className="btn btn-primary" style={{ width: 'auto', padding: '6px 12px', fontSize: '12px' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.Telegram?.WebApp?.close()
+                  window.open('https://t.me/RootedDatingBot', '_blank')
+                }}>
+                Chat
+              </button>
             </div>
           </div>
         )
@@ -82,7 +92,7 @@ export default function Matches({ user }: Props) {
           textAlign: 'center', color: 'var(--text-secondary)',
           fontSize: '13px', marginTop: '20px',
         }}>
-          Chat with your matches directly in the Rooted bot.
+          Tap "Chat" to message your match in the Rooted bot.
           Your messages are private — no phone numbers shared.
         </p>
       )}
