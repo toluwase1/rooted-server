@@ -172,12 +172,16 @@ func (r *PostgresRepo) GetLatestMessage(ctx context.Context, conversationID stri
 }
 
 func (r *PostgresRepo) SetChatRouting(ctx context.Context, routing ChatRouting) error {
+	var convID interface{}
+	if routing.ActiveConversationID != "" {
+		convID = routing.ActiveConversationID
+	}
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO telegram_chat_routing (telegram_chat_id, user_id, active_conversation_id)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (telegram_chat_id) DO UPDATE
 		SET user_id = $2, active_conversation_id = $3
-	`, routing.TelegramChatID, routing.UserID, routing.ActiveConversationID)
+	`, routing.TelegramChatID, routing.UserID, convID)
 	return err
 }
 

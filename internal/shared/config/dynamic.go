@@ -24,31 +24,52 @@ func NewDynamicConfig(db *pgxpool.Pool, redis *database.SafeRedis) *DynamicConfi
 	return &DynamicConfig{db: db, redis: redis}
 }
 
+func (c *DynamicConfig) hasDB() bool {
+	return c.db != nil
+}
+
+// getFromDB fetches a raw JSONB value from admin_config. Returns nil if DB unavailable or key not found.
+func (c *DynamicConfig) getFromDB(ctx context.Context, key string) []byte {
+	if !c.hasDB() {
+		return nil
+	}
+	var val []byte
+	err := c.db.QueryRow(ctx, "SELECT value FROM admin_config WHERE key = $1", key).Scan(&val)
+	if err != nil {
+		return nil
+	}
+	return val
+}
+
+// getRegionalFromDB fetches a regional override. Returns nil if not found.
+func (c *DynamicConfig) getRegionalFromDB(ctx context.Context, key, region string) []byte {
+	if !c.hasDB() {
+		return nil
+	}
+	var val []byte
+	err := c.db.QueryRow(ctx,
+		"SELECT value FROM admin_config_regional WHERE config_key = $1 AND region = $2",
+		key, region).Scan(&val)
+	if err != nil {
+		return nil
+	}
+	return val
+}
+
 // GetInt returns an integer config value, checking Redis cache first, then PostgreSQL.
 func (c *DynamicConfig) GetInt(ctx context.Context, key string, defaultVal int) int {
 	cacheKey := "config:" + key
-
-	// 1. Check Redis
-	val, err := c.redis.Get(ctx, cacheKey).Int()
-	if err == nil {
+	if val, err := c.redis.Get(ctx, cacheKey).Int(); err == nil {
 		return val
 	}
-
-	// 2. Cache miss → check PostgreSQL
-	var jsonVal []byte
-	err = c.db.QueryRow(ctx,
-		"SELECT value FROM admin_config WHERE key = $1", key,
-	).Scan(&jsonVal)
-	if err != nil {
+	jsonVal := c.getFromDB(ctx, key)
+	if jsonVal == nil {
 		return defaultVal
 	}
-
 	var result int
-	if err := json.Unmarshal(jsonVal, &result); err != nil {
+	if json.Unmarshal(jsonVal, &result) != nil {
 		return defaultVal
 	}
-
-	// 3. Cache for next time
 	c.redis.Set(ctx, cacheKey, result, configCacheTTL)
 	return result
 }
@@ -56,25 +77,17 @@ func (c *DynamicConfig) GetInt(ctx context.Context, key string, defaultVal int) 
 // GetFloat returns a float64 config value.
 func (c *DynamicConfig) GetFloat(ctx context.Context, key string, defaultVal float64) float64 {
 	cacheKey := "config:" + key
-
-	val, err := c.redis.Get(ctx, cacheKey).Float64()
-	if err == nil {
+	if val, err := c.redis.Get(ctx, cacheKey).Float64(); err == nil {
 		return val
 	}
-
-	var jsonVal []byte
-	err = c.db.QueryRow(ctx,
-		"SELECT value FROM admin_config WHERE key = $1", key,
-	).Scan(&jsonVal)
-	if err != nil {
+	jsonVal := c.getFromDB(ctx, key)
+	if jsonVal == nil {
 		return defaultVal
 	}
-
 	var result float64
-	if err := json.Unmarshal(jsonVal, &result); err != nil {
+	if json.Unmarshal(jsonVal, &result) != nil {
 		return defaultVal
 	}
-
 	c.redis.Set(ctx, cacheKey, result, configCacheTTL)
 	return result
 }
@@ -82,25 +95,17 @@ func (c *DynamicConfig) GetFloat(ctx context.Context, key string, defaultVal flo
 // GetString returns a string config value.
 func (c *DynamicConfig) GetString(ctx context.Context, key string, defaultVal string) string {
 	cacheKey := "config:" + key
-
-	val, err := c.redis.Get(ctx, cacheKey).Result()
-	if err == nil {
+	if val, err := c.redis.Get(ctx, cacheKey).Result(); err == nil {
 		return val
 	}
-
-	var jsonVal []byte
-	err = c.db.QueryRow(ctx,
-		"SELECT value FROM admin_config WHERE key = $1", key,
-	).Scan(&jsonVal)
-	if err != nil {
+	jsonVal := c.getFromDB(ctx, key)
+	if jsonVal == nil {
 		return defaultVal
 	}
-
 	var result string
-	if err := json.Unmarshal(jsonVal, &result); err != nil {
+	if json.Unmarshal(jsonVal, &result) != nil {
 		return defaultVal
 	}
-
 	c.redis.Set(ctx, cacheKey, result, configCacheTTL)
 	return result
 }
@@ -108,22 +113,15 @@ func (c *DynamicConfig) GetString(ctx context.Context, key string, defaultVal st
 // GetBool returns a boolean config value.
 func (c *DynamicConfig) GetBool(ctx context.Context, key string, defaultVal bool) bool {
 	cacheKey := "config:" + key
-
-	val, err := c.redis.Get(ctx, cacheKey).Result()
-	if err == nil {
+	if val, err := c.redis.Get(ctx, cacheKey).Result(); err == nil {
 		return val == "1" || val == "true"
 	}
-
-	var jsonVal []byte
-	err = c.db.QueryRow(ctx,
-		"SELECT value FROM admin_config WHERE key = $1", key,
-	).Scan(&jsonVal)
-	if err != nil {
+	jsonVal := c.getFromDB(ctx, key)
+	if jsonVal == nil {
 		return defaultVal
 	}
-
 	var result bool
-	if err := json.Unmarshal(jsonVal, &result); err != nil {
+	if json.Unmarshal(jsonVal, &result) != nil {
 		return defaultVal
 	}
 
@@ -138,20 +136,13 @@ func (c *DynamicConfig) GetBool(ctx context.Context, key string, defaultVal bool
 // GetJSON returns a JSON config value unmarshaled into the target.
 func (c *DynamicConfig) GetJSON(ctx context.Context, key string, target interface{}) error {
 	cacheKey := "config:" + key
-
-	val, err := c.redis.Get(ctx, cacheKey).Bytes()
-	if err == nil {
+	if val, err := c.redis.Get(ctx, cacheKey).Bytes(); err == nil {
 		return json.Unmarshal(val, target)
 	}
-
-	var jsonVal []byte
-	err = c.db.QueryRow(ctx,
-		"SELECT value FROM admin_config WHERE key = $1", key,
-	).Scan(&jsonVal)
-	if err != nil {
-		return fmt.Errorf("config key %q not found: %w", key, err)
+	jsonVal := c.getFromDB(ctx, key)
+	if jsonVal == nil {
+		return fmt.Errorf("config key %q not found", key)
 	}
-
 	c.redis.Set(ctx, cacheKey, string(jsonVal), configCacheTTL)
 	return json.Unmarshal(jsonVal, target)
 }
@@ -160,18 +151,11 @@ func (c *DynamicConfig) GetJSON(ctx context.Context, key string, target interfac
 func (c *DynamicConfig) GetIntRegional(ctx context.Context, key, region string, defaultVal int) int {
 	if region != "" {
 		regionalKey := "config:" + key + ":" + region
-
-		val, err := c.redis.Get(ctx, regionalKey).Int()
-		if err == nil {
+		if val, err := c.redis.Get(ctx, regionalKey).Int(); err == nil {
 			return val
 		}
-
-		var jsonVal []byte
-		err = c.db.QueryRow(ctx,
-			"SELECT value FROM admin_config_regional WHERE config_key = $1 AND region = $2",
-			key, region,
-		).Scan(&jsonVal)
-		if err == nil {
+		jsonVal := c.getRegionalFromDB(ctx, key, region)
+		if jsonVal != nil {
 			var result int
 			if json.Unmarshal(jsonVal, &result) == nil {
 				c.redis.Set(ctx, regionalKey, result, configCacheTTL)
@@ -179,7 +163,6 @@ func (c *DynamicConfig) GetIntRegional(ctx context.Context, key, region string, 
 			}
 		}
 	}
-
 	return c.GetInt(ctx, key, defaultVal)
 }
 
@@ -187,18 +170,11 @@ func (c *DynamicConfig) GetIntRegional(ctx context.Context, key, region string, 
 func (c *DynamicConfig) GetFloatRegional(ctx context.Context, key, region string, defaultVal float64) float64 {
 	if region != "" {
 		regionalKey := "config:" + key + ":" + region
-
-		val, err := c.redis.Get(ctx, regionalKey).Float64()
-		if err == nil {
+		if val, err := c.redis.Get(ctx, regionalKey).Float64(); err == nil {
 			return val
 		}
-
-		var jsonVal []byte
-		err = c.db.QueryRow(ctx,
-			"SELECT value FROM admin_config_regional WHERE config_key = $1 AND region = $2",
-			key, region,
-		).Scan(&jsonVal)
-		if err == nil {
+		jsonVal := c.getRegionalFromDB(ctx, key, region)
+		if jsonVal != nil {
 			var result float64
 			if json.Unmarshal(jsonVal, &result) == nil {
 				c.redis.Set(ctx, regionalKey, result, configCacheTTL)
@@ -206,7 +182,6 @@ func (c *DynamicConfig) GetFloatRegional(ctx context.Context, key, region string
 			}
 		}
 	}
-
 	return c.GetFloat(ctx, key, defaultVal)
 }
 
@@ -218,6 +193,9 @@ func (c *DynamicConfig) IsFeatureEnabled(ctx context.Context, flag, userID, regi
 	// Try cache first
 	val, err := c.redis.Get(ctx, cacheKey).Bytes()
 	if err != nil {
+		if !c.hasDB() {
+			return false
+		}
 		// Cache miss → load from DB
 		row := c.db.QueryRow(ctx,
 			"SELECT enabled, rollout_percent, target_regions, target_plans FROM feature_flags WHERE key = $1",
