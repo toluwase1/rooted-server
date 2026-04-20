@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"log"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -194,15 +193,9 @@ func (h *Handler) enrichPhotoURLs(ctx context.Context, profile *Profile) {
 		return
 	}
 	for i := range profile.Photos {
-		key := profile.Photos[i].URLMedium
-		if key != "" && !strings.HasPrefix(key, "http") {
-			url, err := h.mediaService.GetPresignedReadURL(ctx, key)
-			if err == nil {
-				profile.Photos[i].URLThumbnail = url
-				profile.Photos[i].URLMedium = url
-				profile.Photos[i].URLLarge = url
-			}
-		}
+		profile.Photos[i].URLThumbnail = h.mediaService.EnrichPhotoURL(ctx, profile.Photos[i].URLThumbnail)
+		profile.Photos[i].URLMedium = h.mediaService.EnrichPhotoURL(ctx, profile.Photos[i].URLMedium)
+		profile.Photos[i].URLLarge = h.mediaService.EnrichPhotoURL(ctx, profile.Photos[i].URLLarge)
 	}
 }
 

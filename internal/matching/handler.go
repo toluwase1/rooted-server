@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"strconv"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rooted-dating/rooted-server/internal/chat"
@@ -26,19 +25,12 @@ func NewHandler(s *Service, us *user.Service, cs *chat.Service, ns *notification
 	return &Handler{service: s, userService: us, chatService: cs, notifService: ns, mediaService: ms}
 }
 
-// enrichCandidatePhotos converts R2 keys to presigned URLs for candidate photos.
 func (h *Handler) enrichCandidatePhotos(ctx context.Context, candidates []ScoredCandidate) {
 	if h.mediaService == nil {
 		return
 	}
 	for i := range candidates {
-		key := candidates[i].PrimaryPhoto
-		if key != "" && !strings.HasPrefix(key, "http") {
-			url, err := h.mediaService.GetPresignedReadURL(ctx, key)
-			if err == nil {
-				candidates[i].PrimaryPhoto = url
-			}
-		}
+		candidates[i].PrimaryPhoto = h.mediaService.EnrichPhotoURL(ctx, candidates[i].PrimaryPhoto)
 	}
 }
 
@@ -207,6 +199,13 @@ func (h *Handler) GetMatches(c *fiber.Ctx) error {
 			otherID = m.UserAID
 		}
 		profile, _ := h.userService.GetProfile(c.Context(), otherID)
+		if profile != nil && h.mediaService != nil {
+			for i := range profile.Photos {
+				profile.Photos[i].URLThumbnail = h.mediaService.EnrichPhotoURL(c.Context(), profile.Photos[i].URLThumbnail)
+				profile.Photos[i].URLMedium = h.mediaService.EnrichPhotoURL(c.Context(), profile.Photos[i].URLMedium)
+				profile.Photos[i].URLLarge = h.mediaService.EnrichPhotoURL(c.Context(), profile.Photos[i].URLLarge)
+			}
+		}
 		enriched = append(enriched, fiber.Map{"match": m, "profile": profile})
 	}
 	if enriched == nil {
