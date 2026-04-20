@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client'
 import PhotoUpload from '../components/PhotoUpload'
+import LocationPicker from '../components/LocationPicker'
 
 const HERITAGE_OPTIONS: { label: string; value: string }[] = [
   { label: 'Nigerian', value: 'nigerian' },
@@ -75,17 +76,6 @@ export default function Onboarding({ onComplete }: Props) {
     }))
   }
 
-  const requestLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          update('latitude', pos.coords.latitude)
-          update('longitude', pos.coords.longitude)
-        },
-        () => {}
-      )
-    }
-  }
 
   const handleAddPhoto = (file: File) => {
     setUploadingPhoto(true)
@@ -172,7 +162,7 @@ export default function Onboarding({ onComplete }: Props) {
 
       <button className="btn btn-primary" style={{ marginTop: '16px' }}
         disabled={!form.first_name || !form.date_of_birth || !form.gender || !form.gender_pref}
-        onClick={() => { requestLocation(); setStep(1) }}>
+        onClick={() => setStep(1)}>
         Continue
       </button>
     </div>,
@@ -228,17 +218,12 @@ export default function Onboarding({ onComplete }: Props) {
     <div key="details" className="container page">
       <h1 className="page-header">Almost done</h1>
 
-      <div className="input-group">
-        <label>City</label>
-        <input value={form.city} onChange={(e) => update('city', e.target.value)}
-          placeholder="Lagos, London, New York..." />
-      </div>
-
-      <div className="input-group">
-        <label>Country code</label>
-        <input value={form.country} onChange={(e) => update('country', e.target.value.toUpperCase())}
-          placeholder="NG, GB, US..." maxLength={3} />
-      </div>
+      <LocationPicker city={form.city} country={form.country}
+        onUpdate={(city, country, lat, lon) => {
+          update('city', city)
+          update('country', country)
+          if (lat && lon) { update('latitude', lat); update('longitude', lon) }
+        }} />
 
       <div className="input-group">
         <label>Faith (optional)</label>

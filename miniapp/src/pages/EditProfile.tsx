@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import LocationPicker from '../components/LocationPicker'
 
 const HERITAGE_OPTIONS: { label: string; value: string }[] = [
   { label: 'Nigerian', value: 'nigerian' }, { label: 'Ghanaian', value: 'ghanaian' },
@@ -96,16 +97,14 @@ export default function EditProfile({ profile, onSaved }: Props) {
         <input value={form.first_name} onChange={(e) => update('first_name', e.target.value)} />
       </div>
 
-      <div className="input-group">
-        <label>City</label>
-        <input value={form.city} onChange={(e) => update('city', e.target.value)} />
-      </div>
-
-      <div className="input-group">
-        <label>Country code</label>
-        <input value={form.country} onChange={(e) => update('country', e.target.value.toUpperCase())}
-          maxLength={3} />
-      </div>
+      <LocationPicker city={form.city} country={form.country}
+        onUpdate={(city, country, lat, lon) => {
+          update('city', city)
+          update('country', country)
+          if (lat && lon) {
+            setForm(prev => ({ ...prev, latitude: lat, longitude: lon } as any))
+          }
+        }} />
 
       <div className="input-group">
         <label>Heritage</label>
