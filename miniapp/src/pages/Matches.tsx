@@ -34,7 +34,7 @@ export default function Matches({ user }: Props) {
         </div>
       )}
 
-      {matches.map(({ match, profile }) => {
+      {matches.map(({ match, profile, conversation_id }: any) => {
         if (!profile) return null
 
         return (
@@ -77,8 +77,7 @@ export default function Matches({ user }: Props) {
               <button className="btn btn-primary" style={{ width: 'auto', padding: '6px 12px', fontSize: '12px' }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  window.Telegram?.WebApp?.close()
-                  window.open('https://t.me/RootedDatingBot', '_blank')
+                  navigate(`/chat/${conversation_id || match.id}`)
                 }}>
                 Chat
               </button>

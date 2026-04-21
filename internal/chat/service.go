@@ -95,6 +95,11 @@ func (s *Service) RelayMessage(ctx context.Context, senderTelegramChatID int64, 
 	return &msg, recipientID, nil
 }
 
+// GetConversationByMatch returns the conversation for a given match ID.
+func (s *Service) GetConversationByMatch(ctx context.Context, matchID string) (*Conversation, error) {
+	return s.repo.GetConversationByMatch(ctx, matchID)
+}
+
 // GetChatRouting returns the routing record for a telegram chat ID.
 func (s *Service) GetChatRouting(ctx context.Context, telegramChatID int64) (*ChatRouting, error) {
 	return s.getChatRouting(ctx, telegramChatID)

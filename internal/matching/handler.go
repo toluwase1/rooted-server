@@ -206,7 +206,13 @@ func (h *Handler) GetMatches(c *fiber.Ctx) error {
 				profile.Photos[i].URLLarge = h.mediaService.EnrichPhotoURL(c.Context(), profile.Photos[i].URLLarge)
 			}
 		}
-		enriched = append(enriched, fiber.Map{"match": m, "profile": profile})
+		// Look up conversation ID for chat
+		var convID string
+		conv, _ := h.chatService.GetConversationByMatch(c.Context(), m.ID)
+		if conv != nil {
+			convID = conv.ID
+		}
+		enriched = append(enriched, fiber.Map{"match": m, "profile": profile, "conversation_id": convID})
 	}
 	if enriched == nil {
 		enriched = []fiber.Map{}

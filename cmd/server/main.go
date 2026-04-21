@@ -101,7 +101,8 @@ func main() {
 
 	userHandler := user.NewHandler(userService, mediaService)
 	matchingHandler := matching.NewHandler(matchingService, userService, chatService, notifService, mediaService)
-	chatHandler := chat.NewHandler(chatService, userService)
+	chatHub := chat.NewHub()
+	chatHandler := chat.NewHandler(chatService, userService, chatHub)
 	paymentHandler := payment.NewHandler(paymentService, userService)
 	// Cloud Logging client (for admin log viewer)
 	var logClient *logging.Client
@@ -142,6 +143,9 @@ func main() {
 	})
 
 	app.Post("/webhook/telegram", webhookHandler.Handle)
+
+	// WebSocket for Mini App chat
+	chatHandler.RegisterWebSocket(app)
 
 	api := app.Group("/api", middleware.TelegramAuth(cfg.TelegramBotToken, rdb))
 	userHandler.RegisterRoutes(api)

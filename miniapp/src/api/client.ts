@@ -102,6 +102,8 @@ export const api = {
   getConversations: () => request<any>('GET', '/conversations'),
   getMessages: (convId: string, limit = 50, offset = 0) =>
     request<any>('GET', `/messages/${convId}?limit=${limit}&offset=${offset}`),
+  sendMessage: (convId: string, content: string, contentType = 'text') =>
+    request<any>('POST', `/messages/${convId}`, { content, content_type: contentType }),
 
   // Payments
   getPlans: () => request<any>('GET', '/plans'),
