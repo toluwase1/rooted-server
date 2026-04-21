@@ -301,6 +301,59 @@ func TestExpireStaleConversations(t *testing.T) {
 	assert.Len(t, convs, 0)
 }
 
+func TestGetConversationByMatch(t *testing.T) {
+	cleanDB(t)
+	userA, userB := createUsers(t)
+	matchID := createMatch(t, userA, userB)
+	conv, _ := testService.CreateConversation(testCtx, matchID, userA, userB)
+
+	found, err := testService.GetConversationByMatch(testCtx, matchID)
+	require.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, conv.ID, found.ID)
+}
+
+func TestGetConversationByMatch_NotFound(t *testing.T) {
+	cleanDB(t)
+
+	found, _ := testService.GetConversationByMatch(testCtx, "00000000-0000-0000-0000-000000000000")
+	assert.Nil(t, found)
+}
+
+func TestHubSendToConnectedUser(t *testing.T) {
+	hub := chat.NewHub()
+
+	// Hub should not panic when sending to non-existent user
+	hub.Send("nonexistent", map[string]string{"test": "data"})
+	// No assertion needed — just verifying no panic
+}
+
+func TestMultipleConversationsPerUser(t *testing.T) {
+	cleanDB(t)
+
+	// Create 3 users
+	var userA, userB, userC string
+	testDB.QueryRow(testCtx, "INSERT INTO users (telegram_id) VALUES (100) RETURNING id").Scan(&userA)
+	testDB.QueryRow(testCtx, "INSERT INTO users (telegram_id) VALUES (200) RETURNING id").Scan(&userB)
+	testDB.QueryRow(testCtx, "INSERT INTO users (telegram_id) VALUES (300) RETURNING id").Scan(&userC)
+
+	// User A matches with B and C
+	matchAB := createMatch(t, userA, userB)
+	matchAC := createMatch(t, userA, userC)
+
+	testService.CreateConversation(testCtx, matchAB, userA, userB)
+	testService.CreateConversation(testCtx, matchAC, userA, userC)
+
+	// User A should have 2 conversations
+	convs, err := testService.GetUserConversations(testCtx, userA)
+	require.NoError(t, err)
+	assert.Len(t, convs, 2)
+
+	// User B should have 1
+	convsB, _ := testService.GetUserConversations(testCtx, userB)
+	assert.Len(t, convsB, 1)
+}
+
 func TestGetConversationsNeedingNudge(t *testing.T) {
 	cleanDB(t)
 	userA, userB := createUsers(t)

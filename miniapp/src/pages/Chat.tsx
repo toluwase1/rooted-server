@@ -73,9 +73,13 @@ export default function Chat({ userId }: Props) {
     const pollInterval = setInterval(() => {
       if (conversationId) {
         api.getMessages(conversationId).then((data) => {
-          const newMsgs = (data.messages || []).reverse()
+          const serverMsgs = (data.messages || []).reverse()
           setMessages(prev => {
-            if (newMsgs.length > prev.length) return newMsgs
+            // Count real messages (not temp/optimistic)
+            const realCount = prev.filter(m => !m.id.startsWith('temp-')).length
+            if (serverMsgs.length > realCount) {
+              return serverMsgs
+            }
             return prev
           })
         }).catch(() => {})

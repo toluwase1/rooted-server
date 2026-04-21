@@ -147,11 +147,7 @@ func handleWSMessage(hub *Hub, svc *Service, senderID string, msg WSIncoming) {
 	}
 	hub.Send(recipientID, outgoing)
 
-	// Also confirm to sender
-	hub.Send(senderID, outgoing)
-
-	// Telegram sync happens via the sync worker (async)
-	// The message is saved with synced_to_telegram=false by default
+	// Don't echo back to sender — they already have the optimistic update
 }
 
 func handleWSTyping(hub *Hub, svc *Service, senderID string, msg WSIncoming) {
