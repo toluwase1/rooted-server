@@ -104,7 +104,12 @@ async def create_group(req: CreateGroupRequest):
 
         log.info("Created group %d: %s", group_id, group_title)
 
-        # Add both users
+        # Generate invite link (limited to 2 members)
+        invite = await app_client.create_chat_invite_link(group_id, member_limit=2)
+        invite_link = invite.invite_link
+        log.info("Invite link for group %d: %s", group_id, invite_link)
+
+        # Try direct add (works if userbot has interacted with user before)
         added = []
         for tid, name in [(req.user_a_telegram_id, req.user_a_name),
                           (req.user_b_telegram_id, req.user_b_name)]:
@@ -113,11 +118,7 @@ async def create_group(req: CreateGroupRequest):
                 added.append(name)
                 log.info("Added %s (%d) to group %d", name, tid, group_id)
             except Exception as e:
-                log.warning("Failed to add %s (%d): %s", name, tid, e)
-
-        # Generate invite link as fallback
-        invite = await app_client.create_chat_invite_link(group_id)
-        invite_link = invite.invite_link
+                log.info("Direct add failed for %s (%d), will use invite link: %s", name, tid, e)
 
         # Set group description
         try:

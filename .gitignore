@@ -13,3 +13,6 @@ vendor/
 node_modules/
 miniapp/dist/
 admin/dist/
+*.session
+userbot/venv/
+userbot/__pycache__/
