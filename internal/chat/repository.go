@@ -4,14 +4,15 @@ import "context"
 
 type Repository interface {
 	// Conversations
-	CreateConversation(ctx context.Context, matchID, userAID, userBID string) (*Conversation, error)
+	CreateConversation(ctx context.Context, matchID, userAID, userBID string, expiryDays int) (*Conversation, error)
 	GetConversation(ctx context.Context, id string) (*Conversation, error)
 	GetConversationByMatch(ctx context.Context, matchID string) (*Conversation, error)
 	GetUserConversations(ctx context.Context, userID string) ([]Conversation, error)
 	UpdateConversationStatus(ctx context.Context, id, status string) error
+	SetGroupChat(ctx context.Context, conversationID string, groupID int64, inviteLink string) error
 
 	// Messages
-	SaveMessage(ctx context.Context, msg Message) error
+	SaveMessage(ctx context.Context, msg Message, expiryDays int) error
 	GetMessages(ctx context.Context, conversationID string, limit, offset int) ([]Message, error)
 	GetLatestMessage(ctx context.Context, conversationID string) (*Message, error)
 

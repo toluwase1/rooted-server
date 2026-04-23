@@ -45,6 +45,7 @@ func (h *Handler) RegisterRoutes(admin fiber.Router) {
 func (h *Handler) GetStats(c *fiber.Ctx) error {
 	var totalUsers, activeUsers, verifiedUsers, totalMatches, totalMessages, pendingReports int
 	var todaySignups, todayMatches int
+	var totalConversations, activeGroups, telegramMessages, miniappMessages int
 
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users").Scan(&totalUsers)
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE status = 'active'").Scan(&activeUsers)
@@ -55,15 +56,25 @@ func (h *Handler) GetStats(c *fiber.Ctx) error {
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE").Scan(&todaySignups)
 	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM matches WHERE matched_at >= CURRENT_DATE").Scan(&todayMatches)
 
+	// Chat & userbot stats
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM conversations").Scan(&totalConversations)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM conversations WHERE telegram_group_id IS NOT NULL").Scan(&activeGroups)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM messages WHERE source = 'telegram'").Scan(&telegramMessages)
+	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM messages WHERE source = 'miniapp'").Scan(&miniappMessages)
+
 	return c.JSON(fiber.Map{
-		"total_users":     totalUsers,
-		"active_users":    activeUsers,
-		"verified_users":  verifiedUsers,
-		"total_matches":   totalMatches,
-		"total_messages":  totalMessages,
-		"pending_reports": pendingReports,
-		"today_signups":   todaySignups,
-		"today_matches":   todayMatches,
+		"total_users":         totalUsers,
+		"active_users":        activeUsers,
+		"verified_users":      verifiedUsers,
+		"total_matches":       totalMatches,
+		"total_messages":      totalMessages,
+		"pending_reports":     pendingReports,
+		"today_signups":       todaySignups,
+		"today_matches":       todayMatches,
+		"total_conversations": totalConversations,
+		"active_groups":       activeGroups,
+		"telegram_messages":   telegramMessages,
+		"miniapp_messages":    miniappMessages,
 	})
 }
 

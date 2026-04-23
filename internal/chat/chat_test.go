@@ -99,7 +99,9 @@ func runMigrations(ctx context.Context, db *pgxpool.Pool) error {
 			last_message_at TIMESTAMPTZ,
 			message_count INT DEFAULT 0,
 			created_at TIMESTAMPTZ DEFAULT NOW(),
-			expires_at TIMESTAMPTZ
+			expires_at TIMESTAMPTZ,
+			telegram_group_id BIGINT,
+			telegram_invite_link TEXT
 		);
 
 		CREATE TABLE messages (
@@ -131,7 +133,7 @@ func runMigrations(ctx context.Context, db *pgxpool.Pool) error {
 		);
 
 		INSERT INTO admin_config (key, value, category, description, value_type) VALUES
-		('conversation_expiry_days', '14', 'chat', '', 'int'),
+		('conversation_expiry_days', '3', 'chat', '', 'int'),
 		('chat_nudge_day', '7', 'chat', '', 'int'),
 		('message_rate_limit_per_minute', '30', 'chat', '', 'int');
 	`)
@@ -223,11 +225,11 @@ func TestSaveAndGetMessages(t *testing.T) {
 	testRepo.SaveMessage(testCtx, chat.Message{
 		ConversationID: conv.ID, SenderID: userA,
 		ContentType: "text", Content: "Hello!",
-	})
+	}, 3)
 	testRepo.SaveMessage(testCtx, chat.Message{
 		ConversationID: conv.ID, SenderID: userB,
 		ContentType: "text", Content: "Hi there!",
-	})
+	}, 3)
 
 	msgs, err := testService.GetMessages(testCtx, conv.ID, 50, 0)
 	require.NoError(t, err)
@@ -243,7 +245,7 @@ func TestMessageUpdatesConversation(t *testing.T) {
 	testRepo.SaveMessage(testCtx, chat.Message{
 		ConversationID: conv.ID, SenderID: userA,
 		ContentType: "text", Content: "Hey",
-	})
+	}, 3)
 
 	// Conversation should have updated message count and last_message_at
 	updated, _ := testRepo.GetConversation(testCtx, conv.ID)

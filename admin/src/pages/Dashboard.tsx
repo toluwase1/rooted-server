@@ -35,6 +35,42 @@ export default function Dashboard() {
           <div className="stat-label">Pending Reports</div>
         </div>
       </div>
+
+      <h2 style={{ margin: '2rem 0 1rem', fontSize: '1.1rem', color: 'var(--text-dim)' }}>Today</h2>
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-value">{stats?.today_signups ?? 0}</div>
+          <div className="stat-label">Signups Today</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.today_matches ?? 0}</div>
+          <div className="stat-label">Matches Today</div>
+        </div>
+      </div>
+
+      <h2 style={{ margin: '2rem 0 1rem', fontSize: '1.1rem', color: 'var(--text-dim)' }}>Chat & Userbot</h2>
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-value">{stats?.total_conversations ?? 0}</div>
+          <div className="stat-label">Conversations</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.active_groups ?? 0}</div>
+          <div className="stat-label">Telegram Groups</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.total_messages ?? 0}</div>
+          <div className="stat-label">Total Messages</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.telegram_messages ?? 0}</div>
+          <div className="stat-label">Via Telegram</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.miniapp_messages ?? 0}</div>
+          <div className="stat-label">Via Mini App</div>
+        </div>
+      </div>
     </div>
   )
 }

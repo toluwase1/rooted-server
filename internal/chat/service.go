@@ -11,29 +11,25 @@ import (
 )
 
 type Service struct {
-	repo   Repository
-	redis  *database.SafeRedis
-	config *config.DynamicConfig
+	repo          Repository
+	redis         *database.SafeRedis
+	config        *config.DynamicConfig
+	userbotClient *UserbotClient
 }
 
 func NewService(repo Repository, redis *database.SafeRedis, cfg *config.DynamicConfig) *Service {
 	return &Service{repo: repo, redis: redis, config: cfg}
 }
 
+// SetUserbotClient sets the userbot client for group cleanup operations.
+func (s *Service) SetUserbotClient(ub *UserbotClient) {
+	s.userbotClient = ub
+}
+
 // CreateConversation creates a new proxied chat between two matched users.
 func (s *Service) CreateConversation(ctx context.Context, matchID, userAID, userBID string) (*Conversation, error) {
-	expiryDays := s.config.GetInt(ctx, "conversation_expiry_days", 14)
-
-	conv, err := s.repo.CreateConversation(ctx, matchID, userAID, userBID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set expiry
-	expiresAt := time.Now().AddDate(0, 0, expiryDays)
-	conv.ExpiresAt = &expiresAt
-
-	return conv, nil
+	expiryDays := s.config.GetInt(ctx, "conversation_expiry_days", 3)
+	return s.repo.CreateConversation(ctx, matchID, userAID, userBID, expiryDays)
 }
 
 // RelayMessage handles the core bot-proxied chat flow:
@@ -82,7 +78,7 @@ func (s *Service) RelayMessage(ctx context.Context, senderTelegramChatID int64, 
 		ContentType:    contentType,
 		Content:        content,
 	}
-	if err := s.repo.SaveMessage(ctx, msg); err != nil {
+	if err := s.SaveMessage(ctx, msg); err != nil {
 		return nil, "", fmt.Errorf("saving message: %w", err)
 	}
 
@@ -93,6 +89,12 @@ func (s *Service) RelayMessage(ctx context.Context, senderTelegramChatID int64, 
 	}
 
 	return &msg, recipientID, nil
+}
+
+// SaveMessage saves a message and extends conversation expiry using the admin-configured duration.
+func (s *Service) SaveMessage(ctx context.Context, msg Message) error {
+	expiryDays := s.config.GetInt(ctx, "conversation_expiry_days", 3)
+	return s.repo.SaveMessage(ctx, msg, expiryDays)
 }
 
 // GetConversationByMatch returns the conversation for a given match ID.
@@ -149,12 +151,22 @@ func (s *Service) GetUserConversations(ctx context.Context, userID string) ([]Co
 	return s.repo.GetUserConversations(ctx, userID)
 }
 
-// CloseConversation ends a proxied chat (unmatch).
+// SetGroupChat upgrades a conversation from bot-relay to Telegram supergroup mode.
+func (s *Service) SetGroupChat(ctx context.Context, conversationID string, groupID int64, inviteLink string) error {
+	return s.repo.SetGroupChat(ctx, conversationID, groupID, inviteLink)
+}
+
+// CloseConversation ends a proxied chat (unmatch) and leaves the Telegram group if applicable.
 func (s *Service) CloseConversation(ctx context.Context, conversationID string) error {
+	conv, _ := s.repo.GetConversation(ctx, conversationID)
+	if conv != nil && conv.IsGroupChat() {
+		s.leaveGroup(ctx, *conv.TelegramGroupID)
+	}
 	return s.repo.UpdateConversationStatus(ctx, conversationID, "closed")
 }
 
 // ExpireStaleConversations finds and expires conversations past their expiry date.
+// For group-mode conversations, the userbot leaves the Telegram group to free slots.
 func (s *Service) ExpireStaleConversations(ctx context.Context) (int, error) {
 	convs, err := s.repo.GetExpiredConversations(ctx)
 	if err != nil {
@@ -162,10 +174,23 @@ func (s *Service) ExpireStaleConversations(ctx context.Context) (int, error) {
 	}
 
 	for _, conv := range convs {
+		if conv.IsGroupChat() {
+			s.leaveGroup(ctx, *conv.TelegramGroupID)
+		}
 		s.repo.UpdateConversationStatus(ctx, conv.ID, "expired")
 	}
 
 	return len(convs), nil
+}
+
+// leaveGroup asks the userbot to leave a Telegram group (best effort).
+func (s *Service) leaveGroup(ctx context.Context, groupID int64) {
+	if s.userbotClient == nil {
+		return
+	}
+	if err := s.userbotClient.LeaveGroup(ctx, groupID); err != nil {
+		fmt.Printf("WARN failed to leave group %d: %v\n", groupID, err)
+	}
 }
 
 // GetConversationsNeedingNudge returns conversations that need a "don't let this fade" nudge.

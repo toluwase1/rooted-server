@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"log"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -9,13 +10,14 @@ import (
 )
 
 type Handler struct {
-	service     *Service
-	userService *user.Service
-	hub         *Hub
+	service       *Service
+	userService   *user.Service
+	hub           *Hub
+	userbotClient *UserbotClient
 }
 
-func NewHandler(s *Service, us *user.Service, hub *Hub) *Handler {
-	return &Handler{service: s, userService: us, hub: hub}
+func NewHandler(s *Service, us *user.Service, hub *Hub, ub *UserbotClient) *Handler {
+	return &Handler{service: s, userService: us, hub: hub, userbotClient: ub}
 }
 
 func (h *Handler) RegisterRoutes(api fiber.Router) {
@@ -48,7 +50,7 @@ func (h *Handler) SendMessage(c *fiber.Ctx) error {
 		ContentType:    body.ContentType,
 		Content:        body.Content,
 	}
-	if err := h.service.repo.SaveMessage(c.Context(), msg); err != nil {
+	if err := h.service.SaveMessage(c.Context(), msg); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Something went wrong. Please try again."})
 	}
 
@@ -66,6 +68,18 @@ func (h *Handler) SendMessage(c *fiber.Ctx) error {
 			ContentType:    body.ContentType,
 			Content:        body.Content,
 		})
+
+		// If group mode, also forward to Telegram group
+		if conv.IsGroupChat() {
+			profile, _ := h.userService.GetProfile(c.Context(), u.ID)
+			senderName := "User"
+			if profile != nil {
+				senderName = profile.FirstName
+			}
+			if err := h.userbotClient.SendToGroup(c.Context(), *conv.TelegramGroupID, senderName, body.Content, body.ContentType); err != nil {
+				log.Printf("WARN forward to telegram group %d: %v", *conv.TelegramGroupID, err)
+			}
+		}
 	}
 
 	return c.JSON(fiber.Map{"status": "sent"})
@@ -73,7 +87,7 @@ func (h *Handler) SendMessage(c *fiber.Ctx) error {
 
 // RegisterWebSocket registers the WebSocket endpoint (called from main.go, outside auth group).
 func (h *Handler) RegisterWebSocket(app *fiber.App) {
-	app.Get("/ws/chat", HandleWebSocket(h.hub, h.service, func(c *fiber.Ctx) string {
+	app.Get("/ws/chat", HandleWebSocket(h.hub, h.service, h.userbotClient, func(c *fiber.Ctx) string {
 		return c.Query("user_id")
 	}))
 }

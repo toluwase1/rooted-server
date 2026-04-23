@@ -20,8 +20,9 @@ type Config struct {
 	RedisURL string
 
 	// Telegram
-	TelegramBotToken string
+	TelegramBotToken  string
 	TelegramWebAppURL string // URL where the Mini App is hosted
+	UserbotURL        string // Python userbot service URL
 
 	// Cloudflare R2 (S3-compatible)
 	R2AccountID       string
@@ -56,6 +57,7 @@ func Load() *Config {
 
 		TelegramBotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
 		TelegramWebAppURL: getEnv("TELEGRAM_WEBAPP_URL", ""),
+		UserbotURL:        getEnv("USERBOT_URL", ""),
 
 		R2AccountID:      getEnv("R2_ACCOUNT_ID", ""),
 		R2AccessKeyID:    getEnv("R2_ACCESS_KEY_ID", ""),

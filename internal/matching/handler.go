@@ -2,6 +2,7 @@ package matching
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 
@@ -14,15 +15,16 @@ import (
 )
 
 type Handler struct {
-	service      *Service
-	userService  *user.Service
-	chatService  *chat.Service
-	notifService *notification.Service
-	mediaService *media.Service
+	service       *Service
+	userService   *user.Service
+	chatService   *chat.Service
+	notifService  *notification.Service
+	mediaService  *media.Service
+	userbotClient *chat.UserbotClient
 }
 
-func NewHandler(s *Service, us *user.Service, cs *chat.Service, ns *notification.Service, ms *media.Service) *Handler {
-	return &Handler{service: s, userService: us, chatService: cs, notifService: ns, mediaService: ms}
+func NewHandler(s *Service, us *user.Service, cs *chat.Service, ns *notification.Service, ms *media.Service, ub *chat.UserbotClient) *Handler {
+	return &Handler{service: s, userService: us, chatService: cs, notifService: ns, mediaService: ms, userbotClient: ub}
 }
 
 func (h *Handler) enrichCandidatePhotos(ctx context.Context, candidates []ScoredCandidate) {
@@ -159,21 +161,51 @@ func (h *Handler) Swipe(c *fiber.Ctx) error {
 			result["conversation_id"] = conv.ID
 		}
 
-		// Notify both users (best effort — don't fail the swipe if notification fails)
+		// Set up chat channel + notify both users (best effort, async)
 		go func() {
+			ctx := context.Background()
 			otherID := match.UserBID
 			if u.ID == match.UserBID {
 				otherID = match.UserAID
 			}
-			otherProfile, _ := h.userService.GetProfile(c.Context(), otherID)
-			myProfile, _ := h.userService.GetProfile(c.Context(), u.ID)
+			otherProfile, _ := h.userService.GetProfile(ctx, otherID)
+			myProfile, _ := h.userService.GetProfile(ctx, u.ID)
+			if otherProfile == nil || myProfile == nil {
+				return
+			}
 
-			if otherProfile != nil && myProfile != nil {
-				otherChatID, _ := h.chatService.GetRecipientTelegramChatID(c.Context(), otherID)
-				myChatID, _ := h.chatService.GetRecipientTelegramChatID(c.Context(), u.ID)
-				if otherChatID != 0 && myChatID != 0 {
-					h.notifService.NotifyMatch(c.Context(), myChatID, otherChatID, myProfile.FirstName, otherProfile.FirstName)
+			// Try supergroup first, fall back to bot relay
+			var inviteLink string
+			if h.userbotClient != nil && conv != nil {
+				otherUser, _ := h.userService.GetUser(ctx, otherID)
+				myUser, _ := h.userService.GetUser(ctx, u.ID)
+
+				if myUser != nil && otherUser != nil {
+					groupResp, groupCreationErr := h.userbotClient.CreateGroup(
+						ctx, conv.ID,
+						myUser.TelegramID, otherUser.TelegramID,
+						myProfile.FirstName, otherProfile.FirstName,
+					)
+					if groupCreationErr != nil {
+						log.Printf("WARN group creation failed, using bot relay: %v", groupCreationErr)
+					} else {
+						// Persist group info on the conversation
+						h.chatService.SetGroupChat(ctx, conv.ID, groupResp.GroupID, groupResp.InviteLink)
+						inviteLink = groupResp.InviteLink
+						log.Printf("Group chat created for match %s (group %d)", match.ID, groupResp.GroupID)
+					}
 				}
+			}
+
+			// Notify both users
+			myChatID, _ := h.chatService.GetRecipientTelegramChatID(ctx, u.ID)
+			otherChatID, _ := h.chatService.GetRecipientTelegramChatID(ctx, otherID)
+
+			if myChatID != 0 {
+				h.notifService.SendBotMessage(ctx, myChatID, matchNotification(otherProfile.FirstName, inviteLink))
+			}
+			if otherChatID != 0 {
+				h.notifService.SendBotMessage(ctx, otherChatID, matchNotification(myProfile.FirstName, inviteLink))
 			}
 		}()
 	}
@@ -276,6 +308,16 @@ func (h *Handler) buildFilters(profile *user.Profile, c *fiber.Ctx) CandidateFil
 	}
 }
 
+func matchNotification(otherName, inviteLink string) string {
+	msg := fmt.Sprintf("You and %s are a match!", otherName)
+	if inviteLink != "" {
+		msg += fmt.Sprintf("\n\nJoin your private chat: %s", inviteLink)
+	} else {
+		msg += "\n\nSend them a message — I'll relay it for you."
+	}
+	return msg
+}
+
 func intQuery(c *fiber.Ctx, key string, defaultVal int) int {
 	v, err := strconv.Atoi(c.Query(key, ""))
 	if err != nil {
@@ -283,4 +325,3 @@ func intQuery(c *fiber.Ctx, key string, defaultVal int) int {
 	}
 	return v
 }
-

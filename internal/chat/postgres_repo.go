@@ -16,19 +16,21 @@ func NewPostgresRepo(db *pgxpool.Pool) *PostgresRepo {
 	return &PostgresRepo{db: db}
 }
 
-func (r *PostgresRepo) CreateConversation(ctx context.Context, matchID, userAID, userBID string) (*Conversation, error) {
+func (r *PostgresRepo) CreateConversation(ctx context.Context, matchID, userAID, userBID string, expiryDays int) (*Conversation, error) {
 	var conv Conversation
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO conversations (match_id, user_a_id, user_b_id,
 			expires_at)
 		VALUES ($1, $2, $3,
-			NOW() + INTERVAL '14 days')
+			NOW() + INTERVAL '1 day' * $4)
 		RETURNING id, match_id, user_a_id, user_b_id, status,
-		          last_message_at, message_count, created_at, expires_at
-	`, matchID, userAID, userBID).Scan(
+		          last_message_at, message_count, created_at, expires_at,
+		          telegram_group_id, telegram_invite_link
+	`, matchID, userAID, userBID, expiryDays).Scan(
 		&conv.ID, &conv.MatchID, &conv.UserAID, &conv.UserBID,
 		&conv.Status, &conv.LastMessageAt, &conv.MessageCount,
 		&conv.CreatedAt, &conv.ExpiresAt,
+		&conv.TelegramGroupID, &conv.TelegramInviteLink,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating conversation: %w", err)
@@ -36,16 +38,26 @@ func (r *PostgresRepo) CreateConversation(ctx context.Context, matchID, userAID,
 	return &conv, nil
 }
 
+func (r *PostgresRepo) SetGroupChat(ctx context.Context, conversationID string, groupID int64, inviteLink string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE conversations SET telegram_group_id = $2, telegram_invite_link = $3
+		WHERE id = $1
+	`, conversationID, groupID, inviteLink)
+	return err
+}
+
 func (r *PostgresRepo) GetConversation(ctx context.Context, id string) (*Conversation, error) {
 	var conv Conversation
 	err := r.db.QueryRow(ctx, `
 		SELECT id, match_id, user_a_id, user_b_id, status,
-		       last_message_at, message_count, created_at, expires_at
+		       last_message_at, message_count, created_at, expires_at,
+		       telegram_group_id, telegram_invite_link
 		FROM conversations WHERE id = $1
 	`, id).Scan(
 		&conv.ID, &conv.MatchID, &conv.UserAID, &conv.UserBID,
 		&conv.Status, &conv.LastMessageAt, &conv.MessageCount,
 		&conv.CreatedAt, &conv.ExpiresAt,
+		&conv.TelegramGroupID, &conv.TelegramInviteLink,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -60,12 +72,14 @@ func (r *PostgresRepo) GetConversationByMatch(ctx context.Context, matchID strin
 	var conv Conversation
 	err := r.db.QueryRow(ctx, `
 		SELECT id, match_id, user_a_id, user_b_id, status,
-		       last_message_at, message_count, created_at, expires_at
+		       last_message_at, message_count, created_at, expires_at,
+		       telegram_group_id, telegram_invite_link
 		FROM conversations WHERE match_id = $1 AND status = 'active'
 	`, matchID).Scan(
 		&conv.ID, &conv.MatchID, &conv.UserAID, &conv.UserBID,
 		&conv.Status, &conv.LastMessageAt, &conv.MessageCount,
 		&conv.CreatedAt, &conv.ExpiresAt,
+		&conv.TelegramGroupID, &conv.TelegramInviteLink,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -79,7 +93,8 @@ func (r *PostgresRepo) GetConversationByMatch(ctx context.Context, matchID strin
 func (r *PostgresRepo) GetUserConversations(ctx context.Context, userID string) ([]Conversation, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, match_id, user_a_id, user_b_id, status,
-		       last_message_at, message_count, created_at, expires_at
+		       last_message_at, message_count, created_at, expires_at,
+		       telegram_group_id, telegram_invite_link
 		FROM conversations
 		WHERE (user_a_id = $1 OR user_b_id = $1) AND status = 'active'
 		ORDER BY COALESCE(last_message_at, created_at) DESC
@@ -94,7 +109,8 @@ func (r *PostgresRepo) GetUserConversations(ctx context.Context, userID string) 
 		var conv Conversation
 		if err := rows.Scan(&conv.ID, &conv.MatchID, &conv.UserAID, &conv.UserBID,
 			&conv.Status, &conv.LastMessageAt, &conv.MessageCount,
-			&conv.CreatedAt, &conv.ExpiresAt); err != nil {
+			&conv.CreatedAt, &conv.ExpiresAt,
+			&conv.TelegramGroupID, &conv.TelegramInviteLink); err != nil {
 			return nil, err
 		}
 		convs = append(convs, conv)
@@ -108,7 +124,7 @@ func (r *PostgresRepo) UpdateConversationStatus(ctx context.Context, id, status 
 	return err
 }
 
-func (r *PostgresRepo) SaveMessage(ctx context.Context, msg Message) error {
+func (r *PostgresRepo) SaveMessage(ctx context.Context, msg Message, expiryDays int) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO messages (conversation_id, sender_id, content_type, content)
 		VALUES ($1, $2, $3, $4)
@@ -117,14 +133,14 @@ func (r *PostgresRepo) SaveMessage(ctx context.Context, msg Message) error {
 		return err
 	}
 
-	// Update conversation metadata
+	// Update conversation metadata — extend expiry on each message
 	_, err = r.db.Exec(ctx, `
 		UPDATE conversations
 		SET last_message_at = NOW(),
 		    message_count = message_count + 1,
-		    expires_at = NOW() + INTERVAL '14 days'
+		    expires_at = NOW() + INTERVAL '1 day' * $2
 		WHERE id = $1
-	`, msg.ConversationID)
+	`, msg.ConversationID, expiryDays)
 	return err
 }
 
@@ -222,7 +238,8 @@ func (r *PostgresRepo) SetActiveConversation(ctx context.Context, telegramChatID
 func (r *PostgresRepo) GetExpiredConversations(ctx context.Context) ([]Conversation, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, match_id, user_a_id, user_b_id, status,
-		       last_message_at, message_count, created_at, expires_at
+		       last_message_at, message_count, created_at, expires_at,
+		       telegram_group_id, telegram_invite_link
 		FROM conversations
 		WHERE status = 'active' AND expires_at < NOW()
 	`)
@@ -236,7 +253,8 @@ func (r *PostgresRepo) GetExpiredConversations(ctx context.Context) ([]Conversat
 		var conv Conversation
 		rows.Scan(&conv.ID, &conv.MatchID, &conv.UserAID, &conv.UserBID,
 			&conv.Status, &conv.LastMessageAt, &conv.MessageCount,
-			&conv.CreatedAt, &conv.ExpiresAt)
+			&conv.CreatedAt, &conv.ExpiresAt,
+			&conv.TelegramGroupID, &conv.TelegramInviteLink)
 		convs = append(convs, conv)
 	}
 	return convs, nil
@@ -245,7 +263,8 @@ func (r *PostgresRepo) GetExpiredConversations(ctx context.Context) ([]Conversat
 func (r *PostgresRepo) GetConversationsNeedingNudge(ctx context.Context, nudgeDays int) ([]Conversation, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, match_id, user_a_id, user_b_id, status,
-		       last_message_at, message_count, created_at, expires_at
+		       last_message_at, message_count, created_at, expires_at,
+		       telegram_group_id, telegram_invite_link
 		FROM conversations
 		WHERE status = 'active'
 		  AND last_message_at < NOW() - INTERVAL '1 day' * $1
@@ -261,7 +280,8 @@ func (r *PostgresRepo) GetConversationsNeedingNudge(ctx context.Context, nudgeDa
 		var conv Conversation
 		rows.Scan(&conv.ID, &conv.MatchID, &conv.UserAID, &conv.UserBID,
 			&conv.Status, &conv.LastMessageAt, &conv.MessageCount,
-			&conv.CreatedAt, &conv.ExpiresAt)
+			&conv.CreatedAt, &conv.ExpiresAt,
+			&conv.TelegramGroupID, &conv.TelegramInviteLink)
 		convs = append(convs, conv)
 	}
 	return convs, nil

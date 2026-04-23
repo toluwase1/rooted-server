@@ -58,6 +58,9 @@ func (c *UserbotClient) CreateGroup(ctx context.Context, conversationID string, 
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 429 {
+		return nil, fmt.Errorf("rate_limited: userbot hit Telegram flood wait")
+	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("userbot returned %d", resp.StatusCode)
 	}
@@ -65,6 +68,31 @@ func (c *UserbotClient) CreateGroup(ctx context.Context, conversationID string, 
 	var result CreateGroupResponse
 	json.NewDecoder(resp.Body).Decode(&result)
 	return &result, nil
+}
+
+// LeaveGroup makes the userbot leave a Telegram group, freeing a slot.
+func (c *UserbotClient) LeaveGroup(ctx context.Context, telegramGroupID int64) error {
+	if c == nil {
+		return nil
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"telegram_group_id": telegramGroupID,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/leave-group", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("userbot leave-group failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return nil
 }
 
 // SendToGroup sends a Mini App message to the Telegram group.

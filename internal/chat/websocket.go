@@ -73,7 +73,7 @@ type WSOutgoing struct {
 }
 
 // HandleWebSocket upgrades HTTP to WebSocket for Mini App chat.
-func HandleWebSocket(hub *Hub, chatService *Service, getUserID func(c *fiber.Ctx) string) fiber.Handler {
+func HandleWebSocket(hub *Hub, chatService *Service, userbotClient *UserbotClient, getUserID func(c *fiber.Ctx) string) fiber.Handler {
 	return websocket.New(func(c *websocket.Conn) {
 		userID := c.Query("user_id")
 		if userID == "" {
@@ -99,7 +99,7 @@ func HandleWebSocket(hub *Hub, chatService *Service, getUserID func(c *fiber.Ctx
 
 			switch msg.Type {
 			case "message":
-				handleWSMessage(hub, chatService, userID, msg)
+				handleWSMessage(hub, chatService, userbotClient, userID, msg)
 			case "typing":
 				handleWSTyping(hub, chatService, userID, msg)
 			}
@@ -109,7 +109,7 @@ func HandleWebSocket(hub *Hub, chatService *Service, getUserID func(c *fiber.Ctx
 	})
 }
 
-func handleWSMessage(hub *Hub, svc *Service, senderID string, msg WSIncoming) {
+func handleWSMessage(hub *Hub, svc *Service, userbotClient *UserbotClient, senderID string, msg WSIncoming) {
 	ctx := context.Background()
 
 	// Save message to DB
@@ -119,7 +119,7 @@ func handleWSMessage(hub *Hub, svc *Service, senderID string, msg WSIncoming) {
 		ContentType:    msg.ContentType,
 		Content:        msg.Content,
 	}
-	if err := svc.repo.SaveMessage(ctx, dbMsg); err != nil {
+	if err := svc.SaveMessage(ctx, dbMsg); err != nil {
 		log.Printf("ERROR WebSocket save message: %v", err)
 		hub.Send(senderID, WSOutgoing{Type: "error", Content: "Failed to send message"})
 		return
@@ -147,7 +147,14 @@ func handleWSMessage(hub *Hub, svc *Service, senderID string, msg WSIncoming) {
 	}
 	hub.Send(recipientID, outgoing)
 
-	// Don't echo back to sender — they already have the optimistic update
+	// If group mode, also forward to Telegram group
+	if conv.IsGroupChat() && userbotClient != nil {
+		go func() {
+			if err := userbotClient.SendToGroup(ctx, *conv.TelegramGroupID, senderID, msg.Content, msg.ContentType); err != nil {
+				log.Printf("WARN WS forward to telegram group %d: %v", *conv.TelegramGroupID, err)
+			}
+		}()
+	}
 }
 
 func handleWSTyping(hub *Hub, svc *Service, senderID string, msg WSIncoming) {

@@ -3,15 +3,23 @@ package chat
 import "time"
 
 type Conversation struct {
-	ID            string     `json:"id"`
-	MatchID       string     `json:"match_id"`
-	UserAID       string     `json:"user_a_id"`
-	UserBID       string     `json:"user_b_id"`
-	Status        string     `json:"status"` // active, expired, closed
-	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
-	MessageCount  int        `json:"message_count"`
-	CreatedAt     time.Time  `json:"created_at"`
-	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
+	ID                 string     `json:"id"`
+	MatchID            string     `json:"match_id"`
+	UserAID            string     `json:"user_a_id"`
+	UserBID            string     `json:"user_b_id"`
+	Status             string     `json:"status"` // active, expired, closed
+	LastMessageAt      *time.Time `json:"last_message_at,omitempty"`
+	MessageCount       int        `json:"message_count"`
+	CreatedAt          time.Time  `json:"created_at"`
+	ExpiresAt          *time.Time `json:"expires_at,omitempty"`
+	TelegramGroupID    *int64  `json:"telegram_group_id,omitempty"`
+	TelegramInviteLink *string `json:"telegram_invite_link,omitempty"`
+}
+
+// IsGroupChat returns true if this conversation uses a Telegram supergroup.
+// False means bot-relay mode.
+func (c *Conversation) IsGroupChat() bool {
+	return c.TelegramGroupID != nil && *c.TelegramGroupID != 0
 }
 
 type Message struct {

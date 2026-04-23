@@ -99,10 +99,20 @@ func main() {
 
 	// --- Handlers ---
 
+	// Userbot client (for Telegram group creation)
+	userbotClient := chat.NewUserbotClient(cfg.UserbotURL)
+	if userbotClient != nil {
+		log.Printf("Userbot client configured: %s", cfg.UserbotURL)
+	} else {
+		log.Println("Warning: Userbot not configured — Telegram group creation disabled")
+	}
+
+	chatService.SetUserbotClient(userbotClient)
+
 	userHandler := user.NewHandler(userService, mediaService)
-	matchingHandler := matching.NewHandler(matchingService, userService, chatService, notifService, mediaService)
+	matchingHandler := matching.NewHandler(matchingService, userService, chatService, notifService, mediaService, userbotClient)
 	chatHub := chat.NewHub()
-	chatHandler := chat.NewHandler(chatService, userService, chatHub)
+	chatHandler := chat.NewHandler(chatService, userService, chatHub, userbotClient)
 	paymentHandler := payment.NewHandler(paymentService, userService)
 	// Cloud Logging client (for admin log viewer)
 	var logClient *logging.Client

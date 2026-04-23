@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 import psycopg2
 from dotenv import load_dotenv
 from pyrogram import Client, filters
+from pyrogram.errors import FloodWait
 from pyrogram.types import Message
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -36,9 +37,16 @@ app_client = Client(
     phone_number=os.getenv("PHONE_NUMBER", ""),
 )
 
-# Database connection
+# Database connection (optional — userbot works without it)
 def get_db():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        return None
+    try:
+        return psycopg2.connect(url)
+    except Exception as e:
+        log.warning("DB connection failed (non-fatal): %s", e)
+        return None
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
 
@@ -56,18 +64,21 @@ async def lifespan(app: FastAPI):
     await app_client.start()
     log.info("Userbot started: %s", (await app_client.get_me()).first_name)
 
-    # Load managed groups from DB
-    try:
-        db = get_db()
-        cur = db.cursor()
-        cur.execute("SELECT telegram_group_id, id FROM conversations WHERE telegram_group_id IS NOT NULL")
-        for row in cur.fetchall():
-            managed_groups[row[0]] = row[1]
-        cur.close()
-        db.close()
-        log.info("Loaded %d managed groups", len(managed_groups))
-    except Exception as e:
-        log.warning("Failed to load managed groups: %s", e)
+    # Load managed groups from DB (skip if DB unavailable)
+    db = get_db()
+    if db:
+        try:
+            cur = db.cursor()
+            cur.execute("SELECT telegram_group_id, id FROM conversations WHERE telegram_group_id IS NOT NULL")
+            for row in cur.fetchall():
+                managed_groups[row[0]] = row[1]
+            cur.close()
+            db.close()
+            log.info("Loaded %d managed groups", len(managed_groups))
+        except Exception as e:
+            log.warning("Failed to load managed groups: %s", e)
+    else:
+        log.info("No DB — skipping managed groups load")
 
     yield
 
@@ -137,19 +148,22 @@ async def create_group(req: CreateGroupRequest):
             f"Be respectful. Report issues via the Rooted app."
         )
 
-        # Save to DB
-        try:
-            db = get_db()
-            cur = db.cursor()
-            cur.execute(
-                "UPDATE conversations SET telegram_group_id = %s, telegram_invite_link = %s WHERE id = %s",
-                (group_id, invite_link, req.conversation_id)
-            )
-            db.commit()
-            cur.close()
-            db.close()
-        except Exception as e:
-            log.error("Failed to save group to DB: %s", e)
+        # Save to DB (skip if unavailable)
+        db = get_db()
+        if db:
+            try:
+                cur = db.cursor()
+                cur.execute(
+                    "UPDATE conversations SET telegram_group_id = %s, telegram_invite_link = %s WHERE id = %s",
+                    (group_id, invite_link, req.conversation_id)
+                )
+                db.commit()
+                cur.close()
+                db.close()
+            except Exception as e:
+                log.error("Failed to save group to DB: %s", e)
+        else:
+            log.info("No DB — skipping group save (group_id=%d, conv=%s)", group_id, req.conversation_id)
 
         # Track this group
         managed_groups[group_id] = req.conversation_id
@@ -160,9 +174,29 @@ async def create_group(req: CreateGroupRequest):
             "added": added,
         }
 
+    except FloodWait as e:
+        log.warning("FLOOD_WAIT: must wait %d seconds before creating groups", e.value)
+        raise HTTPException(status_code=429, detail=f"rate_limited: retry after {e.value}s")
     except Exception as e:
         log.error("Failed to create group: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class LeaveGroupRequest(BaseModel):
+    telegram_group_id: int
+
+
+@api.post("/leave-group")
+async def leave_group(req: LeaveGroupRequest):
+    """Leave a Telegram group to free up a slot (500 group cap)."""
+    try:
+        await app_client.leave_chat(req.telegram_group_id)
+        managed_groups.pop(req.telegram_group_id, None)
+        log.info("Left group %d", req.telegram_group_id)
+        return {"status": "left"}
+    except Exception as e:
+        log.warning("Failed to leave group %d: %s", req.telegram_group_id, e)
+        return {"status": "already_left"}
 
 
 @api.post("/send-message")
@@ -219,9 +253,13 @@ async def on_group_message(client: Client, message: Message):
     if not content:
         return
 
-    # Look up internal user_id from telegram_id
+    # Look up internal user_id from telegram_id and save message
+    db = get_db()
+    if not db:
+        log.info("No DB — skipping message save from %d in conv %s", sender_telegram_id, conversation_id[:8])
+        return
+
     try:
-        db = get_db()
         cur = db.cursor()
 
         cur.execute("SELECT id FROM users WHERE telegram_id = %s", (sender_telegram_id,))
