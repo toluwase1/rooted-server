@@ -26,6 +26,48 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+# ==========================================
+# SESSION PERSISTENCE (Cloud Storage)
+# ==========================================
+
+SESSION_FILE = "rooted_userbot.session"
+GCS_BUCKET = os.getenv("GCS_SESSION_BUCKET", "")
+GCS_BLOB = "userbot/rooted_userbot.session"
+
+
+def download_session():
+    """Download session file from Cloud Storage on startup."""
+    if not GCS_BUCKET:
+        log.info("No GCS_SESSION_BUCKET — using local session file")
+        return
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(GCS_BLOB)
+        if blob.exists():
+            blob.download_to_filename(SESSION_FILE)
+            log.info("Session downloaded from gs://%s/%s", GCS_BUCKET, GCS_BLOB)
+        else:
+            log.warning("No session in GCS — will need initial auth")
+    except Exception as e:
+        log.warning("Failed to download session: %s", e)
+
+
+def upload_session():
+    """Upload session file to Cloud Storage for persistence."""
+    if not GCS_BUCKET or not os.path.exists(SESSION_FILE):
+        return
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(GCS_BLOB)
+        blob.upload_from_filename(SESSION_FILE)
+        log.info("Session uploaded to gs://%s/%s", GCS_BUCKET, GCS_BLOB)
+    except Exception as e:
+        log.warning("Failed to upload session: %s", e)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("userbot")
 
@@ -61,6 +103,7 @@ managed_groups: dict[int, str] = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start Pyrogram client on startup, stop on shutdown."""
+    download_session()
     await app_client.start()
     log.info("Userbot started: %s", (await app_client.get_me()).first_name)
 
@@ -82,7 +125,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    await app_client.stop()
+    await app_client.stop()  # releases SQLite lock first
+    upload_session()  # persist session after clean shutdown
     log.info("Userbot stopped")
 
 

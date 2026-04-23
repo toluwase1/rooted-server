@@ -60,11 +60,24 @@ build-admin:
 	cd admin && npx tsc --noEmit && VITE_API_URL=https://rooted-api-643943133167.us-central1.run.app npx vite build
 
 # ==========================================
+# GIT (SSH key is toluwasethomas, repo is toluwase1 — use gh auth via HTTPS)
+# ==========================================
+
+push:
+	GIT_CONFIG_GLOBAL=/dev/null git -c credential.helper='!gh auth git-credential' push https://github.com/toluwase1/rooted-server.git main
+
+pull:
+	GIT_CONFIG_GLOBAL=/dev/null git -c credential.helper='!gh auth git-credential' pull https://github.com/toluwase1/rooted-server.git main
+
+# ==========================================
 # DEPLOY
 # ==========================================
 
 deploy-api:
 	source .env.deploy && ./scripts/deploy-api.sh
+
+deploy-userbot:
+	./scripts/deploy-userbot.sh
 
 deploy-miniapp: build-miniapp
 	npx wrangler pages deploy miniapp/dist --project-name=rooted-miniapp --commit-dirty=true
@@ -72,7 +85,7 @@ deploy-miniapp: build-miniapp
 deploy-admin: build-admin
 	npx wrangler pages deploy admin/dist --project-name=rooted-admin --commit-dirty=true
 
-deploy-all: check deploy-api deploy-miniapp deploy-admin
+deploy-all: check deploy-api deploy-userbot deploy-miniapp deploy-admin
 	@echo "✅ All deployed"
 
 # ==========================================
