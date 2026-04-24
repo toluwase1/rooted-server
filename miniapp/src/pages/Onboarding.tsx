@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import PhotoUpload from '../components/PhotoUpload'
 import LocationPicker from '../components/LocationPicker'
@@ -40,7 +41,9 @@ interface Props {
 }
 
 export default function Onboarding({ onComplete }: Props) {
+  const navigate = useNavigate()
   const [step, setStep] = useState(0)
+  const [consentChecked, setConsentChecked] = useState(false)
   const [form, setForm] = useState({
     first_name: '',
     date_of_birth: '',
@@ -92,7 +95,11 @@ export default function Onboarding({ onComplete }: Props) {
   const submit = async () => {
     setSubmitting(true)
     try {
-      const profile = await api.createProfile(form)
+      const profile = await api.createProfile({
+        ...form,
+        terms_accepted: true,
+        privacy_accepted: true,
+      })
 
       for (const photo of photos) {
         if (photo.file) {
@@ -120,8 +127,10 @@ export default function Onboarding({ onComplete }: Props) {
       </div>
 
       <div className="input-group">
-        <label>Date of birth</label>
+        <label>Date of birth (must be 18+)</label>
         <input type="date" value={form.date_of_birth}
+          max={new Date(Date.now() - 18 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+          min="1924-01-01"
           onChange={(e) => update('date_of_birth', e.target.value)} />
       </div>
 
@@ -266,8 +275,57 @@ export default function Onboarding({ onComplete }: Props) {
         </span>
       </div>
 
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          marginTop: '20px',
+          cursor: 'pointer',
+          fontSize: '13px',
+          lineHeight: '1.5',
+          color: 'var(--text-primary)',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={consentChecked}
+          onChange={(e) => setConsentChecked(e.target.checked)}
+          style={{
+            marginTop: '3px',
+            width: '20px',
+            height: '20px',
+            minWidth: '20px',
+            accentColor: 'var(--primary, #8B5CF6)',
+          }}
+        />
+        <span>
+          I agree to the{' '}
+          <span
+            style={{ color: 'var(--primary, #8B5CF6)', textDecoration: 'underline', fontWeight: 500 }}
+            onClick={(e) => { e.preventDefault(); navigate('/terms') }}
+          >
+            Terms of Service
+          </span>
+          ,{' '}
+          <span
+            style={{ color: 'var(--primary, #8B5CF6)', textDecoration: 'underline', fontWeight: 500 }}
+            onClick={(e) => { e.preventDefault(); navigate('/privacy') }}
+          >
+            Privacy Policy
+          </span>
+          , and{' '}
+          <span
+            style={{ color: 'var(--primary, #8B5CF6)', textDecoration: 'underline', fontWeight: 500 }}
+            onClick={(e) => { e.preventDefault(); navigate('/guidelines') }}
+          >
+            Community Guidelines
+          </span>
+        </span>
+      </label>
+
       <button className="btn btn-primary" style={{ marginTop: '16px' }}
-        disabled={submitting}
+        disabled={submitting || !consentChecked}
         onClick={submit}>
         {submitting ? 'Creating profile...' : 'Start matching'}
       </button>

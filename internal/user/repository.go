@@ -15,6 +15,7 @@ type Repository interface {
 	UpdateUserVerification(ctx context.Context, id string, verification string) error
 	UpdateUserSubscription(ctx context.Context, id string, subscription string, expiresAt *string) error
 	UpdateLastActive(ctx context.Context, id string) error
+	AcceptTerms(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
 
 	// Profiles

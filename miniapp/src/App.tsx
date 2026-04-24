@@ -13,6 +13,9 @@ import Premium from './pages/Premium'
 import Verify from './pages/Verify'
 import EditProfile from './pages/EditProfile'
 import ChatPage from './pages/Chat'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+import Guidelines from './pages/Guidelines'
 
 export default function App() {
   const [user, setUser] = useState<any>(null)
@@ -57,7 +60,7 @@ export default function App() {
     return <div className="loading">Loading...</div>
   }
 
-  const hiddenNavPaths = ['/onboarding', '/complete-profile', '/verify', '/edit-profile', '/chat/']
+  const hiddenNavPaths = ['/onboarding', '/complete-profile', '/verify', '/edit-profile', '/chat/', '/terms', '/privacy', '/guidelines']
   const showNav = !hiddenNavPaths.some(p => location.pathname.startsWith(p))
 
   return (
@@ -78,6 +81,9 @@ export default function App() {
         <Route path="/edit-profile" element={
           <EditProfile profile={profile} onSaved={onProfileCompleted} />
         } />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/guidelines" element={<Guidelines />} />
       </Routes>
       {showNav && <Nav />}
     </>

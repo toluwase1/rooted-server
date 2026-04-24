@@ -5,18 +5,25 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/rooted-dating/rooted-server/internal/shared/config"
 	"github.com/rooted-dating/rooted-server/internal/shared/database"
 )
 
 const profileCacheTTL = 1 * time.Hour
 
 type Service struct {
-	repo  Repository
-	redis *database.SafeRedis
+	repo   Repository
+	redis  *database.SafeRedis
+	config *config.DynamicConfig
 }
 
-func NewService(repo Repository, redis *database.SafeRedis) *Service {
-	return &Service{repo: repo, redis: redis}
+func NewService(repo Repository, redis *database.SafeRedis, cfg *config.DynamicConfig) *Service {
+	return &Service{repo: repo, redis: redis, config: cfg}
+}
+
+// GetMinAge returns the admin-configurable minimum age for registration.
+func (s *Service) GetMinAge(ctx context.Context) int {
+	return s.config.GetInt(ctx, "min_registration_age", 18)
 }
 
 // FindOrCreateUser returns existing user or creates a new one from Telegram auth.
@@ -112,6 +119,10 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, req UpdatePr
 	s.redis.Del(ctx, "profile:"+userID)
 
 	return nil
+}
+
+func (s *Service) AcceptTerms(ctx context.Context, userID string) error {
+	return s.repo.AcceptTerms(ctx, userID)
 }
 
 func (s *Service) DeleteAccount(ctx context.Context, userID string) error {

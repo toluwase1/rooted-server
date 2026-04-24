@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rooted-dating/rooted-server/internal/shared/config"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -58,7 +60,8 @@ func TestMain(m *testing.M) {
 
 	testRepo = user.NewPostgresRepo(testDB)
 	rdb := database.NewSafeRedis(nil)
-	testService = user.NewService(testRepo, rdb)
+	dynConfig := config.NewDynamicConfig(testDB, rdb)
+	testService = user.NewService(testRepo, rdb, dynConfig)
 
 	code := m.Run()
 
@@ -83,7 +86,9 @@ func runMigrations(ctx context.Context, db *pgxpool.Pool) error {
 			verification VARCHAR(20) DEFAULT 'unverified',
 			trust_score SMALLINT DEFAULT 50,
 			subscription VARCHAR(20) DEFAULT 'free',
-			sub_expires_at TIMESTAMPTZ
+			sub_expires_at TIMESTAMPTZ,
+			terms_accepted_at TIMESTAMPTZ,
+			privacy_accepted_at TIMESTAMPTZ
 		);
 
 		CREATE TABLE profiles (

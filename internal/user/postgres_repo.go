@@ -24,10 +24,12 @@ func (r *PostgresRepo) CreateUser(ctx context.Context, telegramID int64, telegra
 		INSERT INTO users (telegram_id, telegram_username)
 		VALUES ($1, $2)
 		RETURNING id, telegram_id, telegram_username, status, verification, trust_score,
-		          subscription, sub_expires_at, created_at, updated_at, last_active_at
+		          subscription, sub_expires_at, terms_accepted_at, privacy_accepted_at,
+		          created_at, updated_at, last_active_at
 	`, telegramID, telegramUsername).Scan(
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.Status, &u.Verification,
-		&u.TrustScore, &u.Subscription, &u.SubExpiresAt, &u.CreatedAt, &u.UpdatedAt, &u.LastActiveAt,
+		&u.TrustScore, &u.Subscription, &u.SubExpiresAt, &u.TermsAcceptedAt, &u.PrivacyAcceptedAt,
+		&u.CreatedAt, &u.UpdatedAt, &u.LastActiveAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating user: %w", err)
@@ -39,11 +41,13 @@ func (r *PostgresRepo) GetUserByID(ctx context.Context, id string) (*User, error
 	var u User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, telegram_id, telegram_username, status, verification, trust_score,
-		       subscription, sub_expires_at, created_at, updated_at, last_active_at
+		       subscription, sub_expires_at, terms_accepted_at, privacy_accepted_at,
+		       created_at, updated_at, last_active_at
 		FROM users WHERE id = $1
 	`, id).Scan(
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.Status, &u.Verification,
-		&u.TrustScore, &u.Subscription, &u.SubExpiresAt, &u.CreatedAt, &u.UpdatedAt, &u.LastActiveAt,
+		&u.TrustScore, &u.Subscription, &u.SubExpiresAt, &u.TermsAcceptedAt, &u.PrivacyAcceptedAt,
+		&u.CreatedAt, &u.UpdatedAt, &u.LastActiveAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -58,11 +62,13 @@ func (r *PostgresRepo) GetUserByTelegramID(ctx context.Context, telegramID int64
 	var u User
 	err := r.db.QueryRow(ctx, `
 		SELECT id, telegram_id, telegram_username, status, verification, trust_score,
-		       subscription, sub_expires_at, created_at, updated_at, last_active_at
+		       subscription, sub_expires_at, terms_accepted_at, privacy_accepted_at,
+		       created_at, updated_at, last_active_at
 		FROM users WHERE telegram_id = $1
 	`, telegramID).Scan(
 		&u.ID, &u.TelegramID, &u.TelegramUsername, &u.Status, &u.Verification,
-		&u.TrustScore, &u.Subscription, &u.SubExpiresAt, &u.CreatedAt, &u.UpdatedAt, &u.LastActiveAt,
+		&u.TrustScore, &u.Subscription, &u.SubExpiresAt, &u.TermsAcceptedAt, &u.PrivacyAcceptedAt,
+		&u.CreatedAt, &u.UpdatedAt, &u.LastActiveAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -97,6 +103,13 @@ func (r *PostgresRepo) UpdateUserSubscription(ctx context.Context, id string, su
 func (r *PostgresRepo) UpdateLastActive(ctx context.Context, id string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE users SET last_active_at = NOW() WHERE id = $1
+	`, id)
+	return err
+}
+
+func (r *PostgresRepo) AcceptTerms(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE users SET terms_accepted_at = NOW(), privacy_accepted_at = NOW(), updated_at = NOW() WHERE id = $1
 	`, id)
 	return err
 }

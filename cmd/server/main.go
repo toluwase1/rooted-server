@@ -66,7 +66,7 @@ func main() {
 
 	// --- Services ---
 
-	userService := user.NewService(userRepo, rdb)
+	userService := user.NewService(userRepo, rdb, dynConfig)
 	matchingService := matching.NewService(matchingRepo, rdb, dynConfig)
 	chatService := chat.NewService(chatRepo, rdb, dynConfig)
 	paymentService := payment.NewService(paymentRepo, bot, dynConfig)

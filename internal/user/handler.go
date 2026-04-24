@@ -2,7 +2,9 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -92,6 +94,31 @@ func (h *Handler) CreateProfile(c *fiber.Ctx) error {
 	var req CreateProfileRequest
 	if err := middleware.BindAndValidate(c, &req); err != nil {
 		return err
+	}
+
+	// Consent validation
+	if !req.TermsAccepted || !req.PrivacyAccepted {
+		return c.Status(400).JSON(fiber.Map{"error": "you must accept the Terms of Service and Privacy Policy to create a profile"})
+	}
+
+	// Age validation
+	dob, err := time.Parse("2006-01-02", req.DateOfBirth)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid date of birth"})
+	}
+	age := int(time.Since(dob).Hours() / 24 / 365)
+	minAge := h.service.GetMinAge(c.Context())
+	if age < minAge {
+		return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("you must be at least %d years old", minAge)})
+	}
+	if age > 100 {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid date of birth"})
+	}
+
+	// Record legal consent timestamps
+	if err := h.service.AcceptTerms(c.Context(), u.ID); err != nil {
+		log.Printf("ERROR AcceptTerms user=%s: %v", u.ID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to record consent"})
 	}
 
 	profile, err := h.service.CreateProfile(c.Context(), u.ID, req)

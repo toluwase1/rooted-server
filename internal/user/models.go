@@ -5,17 +5,19 @@ import (
 )
 
 type User struct {
-	ID               string    `json:"id"`
-	TelegramID       int64     `json:"telegram_id"`
-	TelegramUsername  string    `json:"telegram_username,omitempty"`
-	Status           string    `json:"status"`    // active, paused, banned, deleted
-	Verification     string    `json:"verification"` // unverified, photo_verified, id_verified
-	TrustScore       int       `json:"trust_score"`
-	Subscription     string    `json:"subscription"` // free, plus, premium
+	ID               string     `json:"id"`
+	TelegramID       int64      `json:"telegram_id"`
+	TelegramUsername  string     `json:"telegram_username,omitempty"`
+	Status           string     `json:"status"`    // active, paused, banned, deleted
+	Verification     string     `json:"verification"` // unverified, photo_verified, id_verified
+	TrustScore       int        `json:"trust_score"`
+	Subscription     string     `json:"subscription"` // free, plus, premium
 	SubExpiresAt     *time.Time `json:"sub_expires_at,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	LastActiveAt     time.Time `json:"last_active_at"`
+	TermsAcceptedAt  *time.Time `json:"terms_accepted_at,omitempty"`
+	PrivacyAcceptedAt *time.Time `json:"privacy_accepted_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	LastActiveAt     time.Time  `json:"last_active_at"`
 }
 
 type Profile struct {
@@ -77,6 +79,8 @@ type CreateProfileRequest struct {
 	Bio              string           `json:"bio" validate:"max=150"`
 	CulturalPrompts  []PromptResponse `json:"cultural_prompts" validate:"omitempty"`
 	PersonalityPrompts []PromptResponse `json:"personality_prompts" validate:"omitempty"`
+	TermsAccepted    bool             `json:"terms_accepted"`
+	PrivacyAccepted  bool             `json:"privacy_accepted"`
 }
 
 type UpdateProfileRequest struct {
