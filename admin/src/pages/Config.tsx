@@ -8,6 +8,7 @@ export default function Config() {
   const [editValue, setEditValue] = useState('')
   const [editReason, setEditReason] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+  const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -23,9 +24,14 @@ export default function Config() {
 
   const categories = [...new Set(configs.map((c: any) => c.category))].sort()
 
-  const filtered = filterCategory
-    ? configs.filter((c: any) => c.category === filterCategory)
-    : configs
+  const filtered = configs.filter((c: any) => {
+    if (filterCategory && c.category !== filterCategory) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return c.key.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q)
+    }
+    return true
+  })
 
   const handleSave = async () => {
     if (!editingKey || !editReason) return
@@ -51,6 +57,19 @@ export default function Config() {
   return (
     <div>
       <h1 className="page-title">Configuration</h1>
+
+      {/* Search */}
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search config keys..."
+        style={{
+          width: '100%', padding: '10px 14px', marginBottom: '16px',
+          borderRadius: '8px', border: '1px solid var(--border)',
+          background: 'var(--bg)', color: 'var(--text)', fontSize: '14px',
+        }}
+      />
 
       {/* Category filter */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
