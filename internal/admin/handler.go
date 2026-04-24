@@ -265,7 +265,8 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 	query := `
 		SELECT u.id, u.telegram_id, u.status, u.verification, u.trust_score,
 		       u.subscription, u.created_at, u.last_active_at,
-		       p.first_name, p.city, p.country, p.heritage, p.completeness
+		       p.first_name, p.city, p.country, p.heritage, p.completeness,
+		       p.gender, p.gender_pref, p.intention, p.faith, p.diaspora_tag, p.date_of_birth
 		FROM users u
 		LEFT JOIN profiles p ON p.user_id = u.id
 		WHERE 1=1
@@ -304,10 +305,12 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 		var firstName, city, country *string
 		var heritage []string
 		var completeness *int
+		var gender, genderPref, intention, faith, diasporaTag, dateOfBirth *string
 
 		rows.Scan(&id, &telegramID, &userStatus, &verification, &trustScore,
 			&subscription, &createdAt, &lastActiveAt,
-			&firstName, &city, &country, &heritage, &completeness)
+			&firstName, &city, &country, &heritage, &completeness,
+			&gender, &genderPref, &intention, &faith, &diasporaTag, &dateOfBirth)
 
 		users = append(users, fiber.Map{
 			"id": id, "telegram_id": telegramID, "status": userStatus,
@@ -316,6 +319,8 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 			"last_active_at": lastActiveAt, "first_name": firstName,
 			"city": city, "country": country, "heritage": heritage,
 			"completeness": completeness,
+			"gender": gender, "gender_pref": genderPref, "intention": intention,
+			"faith": faith, "diaspora_tag": diasporaTag, "date_of_birth": dateOfBirth,
 		})
 	}
 
@@ -352,12 +357,15 @@ func (h *Handler) GetUser(c *fiber.Ctx) error {
 
 	// Get profile
 	var firstName, city, country, bio *string
+	var gender, genderPref, intention, faith, diasporaTag, faithImportance, dateOfBirth *string
 	var heritage []string
 	var completeness *int
 	h.db.QueryRow(c.Context(), `
-		SELECT first_name, city, country, heritage, bio, completeness
+		SELECT first_name, city, country, heritage, bio, completeness,
+		       gender, gender_pref, intention, faith, faith_importance, diaspora_tag, date_of_birth
 		FROM profiles WHERE user_id = $1
-	`, id).Scan(&firstName, &city, &country, &heritage, &bio, &completeness)
+	`, id).Scan(&firstName, &city, &country, &heritage, &bio, &completeness,
+		&gender, &genderPref, &intention, &faith, &faithImportance, &diasporaTag, &dateOfBirth)
 
 	// Get photos
 	photoRows, _ := h.db.Query(c.Context(), `
@@ -407,6 +415,9 @@ func (h *Handler) GetUser(c *fiber.Ctx) error {
 		"profile": fiber.Map{
 			"first_name": firstName, "city": city, "country": country,
 			"heritage": heritage, "bio": bio, "completeness": completeness,
+			"gender": gender, "gender_pref": genderPref, "intention": intention,
+			"faith": faith, "faith_importance": faithImportance,
+			"diaspora_tag": diasporaTag, "date_of_birth": dateOfBirth,
 		},
 		"photos": photos,
 		"stats": fiber.Map{

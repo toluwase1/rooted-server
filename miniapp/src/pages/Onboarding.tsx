@@ -303,21 +303,21 @@ export default function Onboarding({ onComplete }: Props) {
           I agree to the{' '}
           <span
             style={{ color: 'var(--primary, #8B5CF6)', textDecoration: 'underline', fontWeight: 500 }}
-            onClick={(e) => { e.preventDefault(); navigate('/terms') }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.Telegram?.WebApp?.openLink(window.location.origin + '/terms') }}
           >
             Terms of Service
           </span>
           ,{' '}
           <span
             style={{ color: 'var(--primary, #8B5CF6)', textDecoration: 'underline', fontWeight: 500 }}
-            onClick={(e) => { e.preventDefault(); navigate('/privacy') }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.Telegram?.WebApp?.openLink(window.location.origin + '/privacy') }}
           >
             Privacy Policy
           </span>
           , and{' '}
           <span
             style={{ color: 'var(--primary, #8B5CF6)', textDecoration: 'underline', fontWeight: 500 }}
-            onClick={(e) => { e.preventDefault(); navigate('/guidelines') }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.Telegram?.WebApp?.openLink(window.location.origin + '/guidelines') }}
           >
             Community Guidelines
           </span>
