@@ -36,12 +36,15 @@ export default function LocationPicker({ city, country, onUpdate }: Props) {
         </div>
       </div>
 
-      <button type="button" className="btn btn-secondary"
-        style={{ fontSize: '13px', padding: '8px 14px' }}
+      <button type="button" className="btn btn-primary"
+        style={{ fontSize: '14px', padding: '10px 16px', width: '100%', marginBottom: '4px' }}
         disabled={loading}
         onClick={handleDetect}>
         {loading ? 'Detecting...' : 'Use my location'}
       </button>
+      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', margin: '0 0 8px' }}>
+        or type your city and country above
+      </p>
 
       {error && (
         <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{error}</p>

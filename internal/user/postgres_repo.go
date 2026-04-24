@@ -111,7 +111,7 @@ func (r *PostgresRepo) DeleteUser(ctx context.Context, id string) error {
 func (r *PostgresRepo) CreateProfile(ctx context.Context, userID string, req CreateProfileRequest) (*Profile, error) {
 	culturalJSON, _ := json.Marshal(req.CulturalPrompts)
 	personalityJSON, _ := json.Marshal(req.PersonalityPrompts)
-	completeness := calculateCompleteness(req)
+	completeness := 0 // recalculated on read by service.recalcCompleteness
 
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO profiles (
@@ -412,21 +412,3 @@ func (r *PostgresRepo) GetBlockList(ctx context.Context, userID string) ([]strin
 	return ids, nil
 }
 
-func calculateCompleteness(req CreateProfileRequest) int {
-	score := 0
-	total := 10
-
-	if req.FirstName != "" { score++ }
-	if req.DateOfBirth != "" { score++ }
-	if req.Gender != "" { score++ }
-	if req.City != "" { score++ }
-	if len(req.Heritage) > 0 { score++ }
-	if req.DiasporaTag != "" { score++ }
-	if req.Intention != "" { score++ }
-	if req.Faith != "" { score++ }
-	if len(req.CulturalPrompts) >= 2 { score++ }
-	if len(req.PersonalityPrompts) >= 1 { score++ }
-
-	_ = time.Now() // avoid unused import
-	return (score * 100) / total
-}

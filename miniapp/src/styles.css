@@ -167,8 +167,19 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .swipe-btn:active { transform: scale(0.85); }
-.swipe-btn-pass { background: #FF6B6B15; color: #FF6B6B; }
-.swipe-btn-like { background: #81B29A15; color: #81B29A; }
+.swipe-btn-pass {
+  background: rgba(255,107,107,0.12);
+  color: #FF6B6B;
+  border: 2px solid rgba(255,107,107,0.3);
+  font-size: 28px;
+}
+.swipe-btn-like {
+  background: #E63946;
+  color: white;
+  border: none;
+  font-size: 28px;
+  box-shadow: 0 4px 14px rgba(230,57,70,0.35);
+}
 .swipe-btn-rose { background: #E07A5F15; color: var(--primary); }
 
 /* ==========================================

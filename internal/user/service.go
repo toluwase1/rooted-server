@@ -85,6 +85,10 @@ func (s *Service) CreateProfile(ctx context.Context, userID string, req CreatePr
 		return nil, err
 	}
 
+	// Recalculate completeness and persist
+	profile.Completeness = s.recalcCompleteness(profile)
+	s.repo.UpdateCompleteness(ctx, userID, profile.Completeness)
+
 	// Cache the new profile
 	data, _ := json.Marshal(profile)
 	s.redis.Set(ctx, "profile:"+userID, data, profileCacheTTL)

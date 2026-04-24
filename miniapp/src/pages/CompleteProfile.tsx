@@ -40,24 +40,41 @@ export default function CompleteProfile({ profile, onDone }: Props) {
     profile?.personality_prompts?.[0]?.answer || ''
   )
 
-  // Photos state — load existing from profile
+  // Photos state — load fresh from API to catch uploads from onboarding
   const [photos, setPhotos] = useState<{ id: string; url: string; isExisting: boolean }[]>([])
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [freshCompleteness, setFreshCompleteness] = useState(profile?.completeness || 0)
 
   useEffect(() => {
-    if (profile?.photos) {
-      setPhotos(profile.photos.map((p: any) => ({
-        id: p.id,
-        url: p.url_medium || p.url_thumbnail,
-        isExisting: true,
-      })))
-    }
-  }, [profile])
+    // Reload profile to get current photos + completeness
+    api.getMe().then((data: any) => {
+      const p = data.profile
+      if (p?.photos) {
+        setPhotos(p.photos.map((ph: any) => ({
+          id: ph.id,
+          url: ph.url_medium || ph.url_thumbnail,
+          isExisting: true,
+        })))
+      }
+      if (p?.completeness != null) {
+        setFreshCompleteness(p.completeness)
+      }
+    }).catch(() => {
+      // Fall back to props
+      if (profile?.photos) {
+        setPhotos(profile.photos.map((p: any) => ({
+          id: p.id,
+          url: p.url_medium || p.url_thumbnail,
+          isExisting: true,
+        })))
+      }
+    })
+  }, [])
 
   const hasCulturalPrompts = culturalAnswers.filter(p => p.answer).length >= 2
   const hasPersonalityPrompt = !!personalityAnswer
-  const completeness = profile?.completeness || 0
+  const completeness = freshCompleteness
 
   // Upload photo immediately when selected
   const handleAddPhoto = async (file: File) => {
@@ -223,9 +240,17 @@ export default function CompleteProfile({ profile, onDone }: Props) {
 
       {selectedSection === 'cultural' && (
         <div style={{ marginBottom: '16px' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-            Pick 2 prompts and write your answers.
-          </p>
+          <div style={{
+            background: 'var(--bg-elevated)', padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+            marginBottom: '12px', border: '1px solid var(--border)',
+          }}>
+            <p style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>
+              Pick exactly 2 prompts
+            </p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+              {culturalPrompts.length}/2 selected — tap a prompt to select it, then write your answer
+            </p>
+          </div>
           {CULTURAL_PROMPTS.map((prompt) => {
             const isSelected = culturalPrompts.includes(prompt)
             const existing = culturalAnswers.find((p) => p.prompt === prompt)
