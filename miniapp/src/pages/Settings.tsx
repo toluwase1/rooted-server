@@ -125,7 +125,7 @@ export default function Settings({ user: initialUser, profile, onUserUpdated }: 
       {/* Subscription */}
       <div className="section-label" style={{ marginTop: '16px' }}>Account</div>
 
-      <div className="card">
+      <div className="card" style={{ opacity: 0.6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontWeight: '600', fontSize: '14px' }}>Subscription</div>
@@ -133,17 +133,15 @@ export default function Settings({ user: initialUser, profile, onUserUpdated }: 
               {subLabel[user?.subscription] || 'Free'}
             </div>
           </div>
-          {user?.subscription === 'free' && (
-            <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: '13px' }}
-              onClick={() => navigate('/premium')}>
-              Upgrade
-            </button>
-          )}
+          <span style={{
+            fontSize: '11px', fontWeight: '600', color: 'var(--primary)',
+            background: 'var(--primary)12', padding: '4px 10px', borderRadius: '12px',
+          }}>Coming Soon</span>
         </div>
       </div>
 
       {/* Verification */}
-      <div className="card">
+      <div className="card" style={{ opacity: 0.6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontWeight: '600', fontSize: '14px' }}>Verification</div>
@@ -151,12 +149,10 @@ export default function Settings({ user: initialUser, profile, onUserUpdated }: 
               {user?.verification === 'photo_verified' ? 'Photo verified' : 'Not verified'}
             </div>
           </div>
-          {user?.verification !== 'photo_verified' && (
-            <button className="btn btn-outline" style={{ width: 'auto', padding: '8px 16px', fontSize: '13px' }}
-              onClick={() => navigate('/verify')}>
-              Verify
-            </button>
-          )}
+          <span style={{
+            fontSize: '11px', fontWeight: '600', color: 'var(--primary)',
+            background: 'var(--primary)12', padding: '4px 10px', borderRadius: '12px',
+          }}>Coming Soon</span>
         </div>
       </div>
 
@@ -182,6 +178,12 @@ export default function Settings({ user: initialUser, profile, onUserUpdated }: 
           {confirmDelete ? 'This is permanent and cannot be undone' : 'Permanently delete your account and data'}
         </div>
       </div>
+
+      {/* Close app */}
+      <button className="btn btn-secondary" style={{ marginTop: '16px', width: '100%' }}
+        onClick={() => window.Telegram?.WebApp?.close()}>
+        Close App
+      </button>
     </div>
   )
 }

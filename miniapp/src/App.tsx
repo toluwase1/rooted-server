@@ -41,6 +41,24 @@ export default function App() {
     })
   }, [])
 
+  // Telegram BackButton — show on all pages except home, handle close on home
+  useEffect(() => {
+    const backButton = window.Telegram?.WebApp?.BackButton
+    if (!backButton) return
+
+    const mainTabs = ['/', '/explore', '/matches', '/settings']
+    const isMainTab = mainTabs.includes(location.pathname)
+
+    if (isMainTab) {
+      backButton.hide()
+    } else {
+      backButton.show()
+      const handler = () => navigate(-1)
+      backButton.onClick(handler)
+      return () => backButton.offClick(handler)
+    }
+  }, [location.pathname])
+
   const onProfileCreated = (newProfile: any) => {
     setProfile(newProfile)
     navigate('/complete-profile')
